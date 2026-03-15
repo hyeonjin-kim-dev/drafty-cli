@@ -13,11 +13,53 @@ export interface NoteSummary {
     created_at: string;
 }
 
+export interface NoteDetails extends NoteSummary {
+    updated_at: string;
+}
+
 interface EditableNote {
     id: string;
     body: string;
     cli_tags: string[];
+    status: string;
 }
+
+interface ListNotesOptions {
+    includeArchived?: boolean;
+}
+
+interface ArchiveNoteOptions {
+    expectActive?: boolean;
+}
+
+interface BaseArchiveNoteResult {
+    noteId: string;
+}
+
+export interface ArchivedNoteResult extends BaseArchiveNoteResult {
+    outcome: 'archived';
+}
+
+export interface AlreadyArchivedNoteResult extends BaseArchiveNoteResult {
+    outcome: 'already-archived';
+}
+
+export interface NoteNotFoundResult extends BaseArchiveNoteResult {
+    outcome: 'not-found';
+}
+
+export interface ChangedBeforeArchiveResult extends BaseArchiveNoteResult {
+    outcome: 'changed';
+}
+
+export type ArchiveNoteResult =
+    | ArchivedNoteResult
+    | AlreadyArchivedNoteResult
+    | NoteNotFoundResult
+    | ChangedBeforeArchiveResult;
+
+const ACTIVE_NOTE_STATUS = 'active';
+const ARCHIVED_NOTE_STATUS = 'archived';
 
 export type NoteEditTarget = 'body' | 'tags';
 
@@ -49,17 +91,97 @@ export type NoteEditResult =
 
 export async function listNotes(
     supabase: SupabaseClient<Database>,
+    options: ListNotesOptions = {},
 ): Promise<NoteSummary[]> {
-    const { data, error } = await supabase
+    let query = supabase
         .from('notes')
         .select('id, body, cli_tags, status, created_at')
         .order('created_at', { ascending: false });
+
+    if (!options.includeArchived) {
+        query = query.eq('status', ACTIVE_NOTE_STATUS);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
         throw wrapSupabaseError('Failed to load notes', error);
     }
 
     return data ?? [];
+}
+
+export async function getNoteById(
+    supabase: SupabaseClient<Database>,
+    id: string,
+): Promise<NoteDetails | null> {
+    const { data, error } = await supabase
+        .from('notes')
+        .select('id, body, cli_tags, status, created_at, updated_at')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (error) {
+        throw wrapSupabaseError('Failed to load the note', error);
+    }
+
+    return data;
+}
+
+export async function archiveNote(
+    supabase: SupabaseClient<Database>,
+    id: string,
+    options: ArchiveNoteOptions = {},
+): Promise<ArchiveNoteResult> {
+    const { data, error } = await supabase
+        .from('notes')
+        .update({ status: ARCHIVED_NOTE_STATUS })
+        .eq('id', id)
+        .eq('status', ACTIVE_NOTE_STATUS)
+        .select('id')
+        .maybeSingle();
+
+    if (error) {
+        throw wrapSupabaseError('Failed to remove the note', error);
+    }
+
+    if (data) {
+        return {
+            outcome: 'archived',
+            noteId: data.id,
+        };
+    }
+
+    const currentNote = await getNoteById(supabase, id);
+
+    if (!currentNote) {
+        return {
+            outcome: options.expectActive ? 'changed' : 'not-found',
+            noteId: id,
+        };
+    }
+
+    if (currentNote.status === ARCHIVED_NOTE_STATUS) {
+        return {
+            outcome: options.expectActive ? 'changed' : 'already-archived',
+            noteId: id,
+        };
+    }
+
+    return {
+        outcome: 'changed',
+        noteId: id,
+    };
+}
+
+export async function archiveNotes(
+    supabase: SupabaseClient<Database>,
+    ids: string[],
+    options: ArchiveNoteOptions = {},
+): Promise<ArchiveNoteResult[]> {
+    return Promise.all(
+        ids.map(async (id) => archiveNote(supabase, id, options)),
+    );
 }
 
 export async function editNoteBody(
@@ -231,7 +353,7 @@ async function loadEditableNote(
 ): Promise<EditableNote> {
     const { data, error } = await supabase
         .from('notes')
-        .select('id, body, cli_tags')
+        .select('id, body, cli_tags, status')
         .eq('id', id)
         .maybeSingle();
 
@@ -241,6 +363,10 @@ async function loadEditableNote(
 
     if (!data) {
         throw new DraftyError('Note not found.');
+    }
+
+    if (data.status === ARCHIVED_NOTE_STATUS) {
+        throw new DraftyError('Removed notes cannot be edited.');
     }
 
     return data;

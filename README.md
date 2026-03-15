@@ -7,9 +7,13 @@ The MVP flow is:
 1. Sign in with an emailed 6-digit code.
 2. Open a system editor for note entry.
 3. Save the note to Supabase with the current user id and normalized tags.
-4. List or show notes that belong to the logged-in user.
+4. List active notes by default, or show any note by id including archived notes.
 
 In an interactive terminal, `drafty list` opens a note picker so you can choose whether to edit an existing note body or its tags.
+
+`drafty rm <id>` archives a single note after confirmation. In a TTY, `drafty rm` opens a multi-select checkbox UI so you can archive several active notes at once.
+
+Archived notes are hidden from `drafty list`, remain visible via `drafty show <id>`, and cannot be edited.
 
 Drafty does not support a browser redirect login flow. The login email must contain a code that you paste back into the terminal.
 
@@ -104,16 +108,24 @@ npm run dev -- logout
 npm run dev -- whoami
 npm run dev -- list
 npm run dev -- edit <id>
+npm run dev -- rm <id>
+npm run dev -- rm
 npm run dev -- show <id>
 npm run dev -- work idea
 ```
 
 `drafty edit <id>` prompts you to edit either the existing note body or its tags.
 
+`drafty rm <id>` confirms once, then soft deletes the note by changing its status to `archived`.
+
+`drafty rm` is TTY-only and opens a checkbox selector for removing multiple active notes in one pass.
+
 `drafty list` behaves differently based on the output mode:
 
-1. In a TTY, it opens an arrow-key picker, then lets you choose whether to edit the selected note body or tags.
-2. In a non-TTY context such as piping or redirection, it falls back to the plain text list output.
+1. In a TTY, it opens an arrow-key picker over active notes, then lets you choose whether to edit the selected note body or tags.
+2. In a non-TTY context such as piping or redirection, it falls back to the plain text list output for active notes.
+
+`drafty show <id>` still works for archived notes so you can inspect soft-deleted content later.
 
 Tags are passed as positional arguments. Drafty also strips a leading # if you accidentally use the older syntax.
 

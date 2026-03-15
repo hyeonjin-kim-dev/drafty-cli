@@ -34,9 +34,8 @@ export async function listNotesCommand(): Promise<void> {
 
 function printPlainNoteList(notes: NoteSummary[]): void {
     for (const note of notes) {
-        console.log(
-            `${note.id}  ${formatTimestamp(note.created_at)}  [${note.status}]`,
-        );
+        console.log(`${note.id}  ${formatTimestamp(note.created_at)}`);
+        console.log(`Summary: ${summarizeNoteBody(note.body)}`);
         console.log(`Tags: ${formatTags(note.cli_tags)}`);
         console.log('');
     }
@@ -84,7 +83,6 @@ async function promptForNoteSelection(
                 value: note.id,
                 description: [
                     formatTimestamp(note.created_at),
-                    `[${note.status}]`,
                     `Tags: ${formatTags(note.cli_tags)}`,
                     `ID: ${shortNoteId(note.id)}`,
                 ].join('  '),

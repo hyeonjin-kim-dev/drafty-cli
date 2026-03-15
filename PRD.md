@@ -207,7 +207,8 @@ drafty list
 
 설명:
 
-- 현재 로그인된 사용자의 최근 메모 목록을 보여준다.
+- 현재 로그인된 사용자의 최근 active 메모 목록을 보여준다.
+- archived 메모는 기본 목록에서 숨긴다.
 
 ### 8.6 단일 메모 조회
 
@@ -218,6 +219,31 @@ drafty show <id>
 설명:
 
 - 현재 사용자 소유의 메모 중 해당 ID를 조회한다.
+- archived 메모도 ID로는 계속 조회할 수 있다.
+
+### 8.7 메모 편집
+
+```bash
+drafty edit <id>
+```
+
+설명:
+
+- 현재 사용자 소유의 active 메모를 편집한다.
+- archived 메모는 조회만 가능하며 편집은 허용하지 않는다.
+
+### 8.8 메모 제거
+
+```bash
+drafty rm <id>
+drafty rm
+```
+
+설명:
+
+- 실제 row 삭제 대신 `status = 'archived'` 로 전환하는 soft delete를 수행한다.
+- `drafty rm <id>` 는 단건 제거, `drafty rm` 은 TTY에서만 다중 선택 제거를 지원한다.
+- 제거 전에는 항상 한 번 확인한다.
 
 ---
 
@@ -379,15 +405,22 @@ drafty/
     cli.ts
     commands/
       capture.ts
+      edit.ts
+      interactive-edit.ts
+      interactive-remove.ts
       login.ts
       logout.ts
       whoami.ts
       list.ts
+      remove.ts
       show.ts
     lib/
       auth.ts
       editor.ts
+      errors.ts
+      notes.ts
       parse-tags.ts
+      prompt.ts
       supabase.ts
       session-store.ts
       config.ts
@@ -402,14 +435,21 @@ drafty/
 
 - `cli.ts`: CLI 엔트리포인트
 - `commands/capture.ts`: 메모 작성 및 저장 흐름
+- `commands/edit.ts`: 단일 메모 편집 흐름
+- `commands/interactive-edit.ts`: TTY 편집 선택 프롬프트
+- `commands/interactive-remove.ts`: TTY 제거 선택 및 확인 프롬프트
 - `commands/login.ts`: 로그인 흐름
 - `commands/logout.ts`: 로그아웃 흐름
 - `commands/whoami.ts`: 현재 사용자 확인
 - `commands/list.ts`: 최근 메모 목록 조회
+- `commands/remove.ts`: 단일/다중 메모 soft delete 흐름
 - `commands/show.ts`: 단일 메모 조회
 - `lib/auth.ts`: OTP 로그인 및 세션 처리
 - `lib/editor.ts`: 에디터 실행 및 임시 파일 처리
+- `lib/errors.ts`: 사용자 친화적 에러 포맷팅
+- `lib/notes.ts`: 메모 조회, 편집, soft delete 도메인 로직
 - `lib/parse-tags.ts`: 태그 파싱
+- `lib/prompt.ts`: 터미널 입력 및 확인 프롬프트 헬퍼
 - `lib/supabase.ts`: Supabase 클라이언트 생성
 - `lib/session-store.ts`: 세션 파일 읽기/쓰기
 - `types/database.types.ts`: Supabase 타입 정의
@@ -474,18 +514,21 @@ drafty/
 - 저장 성공 출력
 - 에러 메시지 정리
 
-### 14.5 5단계: 조회 명령 구현
+### 14.5 5단계: 조회 및 라이프사이클 명령 구현
 
 목표:
 
-- 사용자별 메모 목록 및 단일 조회 구현
+- 사용자별 메모 목록, 단일 조회, 편집, soft delete 구현
 
 작업:
 
 - `drafty list`
 - `drafty show <id>`
+- `drafty edit <id>`
+- `drafty rm <id>` / `drafty rm`
 - 최근 순 정렬
 - 본인 소유 메모만 출력
+- archived 메모 기본 숨김 및 조회 전용 유지
 
 ### 14.6 6단계: 타입 안정성 강화
 
@@ -512,6 +555,8 @@ drafty/
 6. 빈 메모는 저장되지 않는다.
 7. `drafty list` 로 자신의 메모 목록을 확인할 수 있다.
 8. RLS가 적용되어 다른 사용자의 메모에 접근할 수 없다.
+9. `drafty rm` 으로 메모를 soft delete 하면 목록에서 사라지지만 `drafty show <id>` 로는 계속 확인할 수 있다.
+10. archived 메모는 `drafty edit <id>` 로 수정할 수 없다.
 
 ---
 
@@ -525,7 +570,13 @@ drafty/
 - 기존 메모를 다시 에디터로 열기
 - 수정 후 저장
 
-### 16.2 태그 관리
+### 16.2 메모 라이프사이클 확장
+
+- archived 메모 복구
+- archived 포함 목록 조회
+- 영구 삭제 정책 검토
+
+### 16.3 태그 관리
 
 - 태그 기준 필터링
 - 태그 목록 조회

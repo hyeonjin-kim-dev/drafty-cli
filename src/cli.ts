@@ -9,6 +9,7 @@ import { editNoteCommand } from './commands/edit.js';
 import { listNotesCommand } from './commands/list.js';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
+import { removeNoteCommand } from './commands/remove.js';
 import { showNoteCommand } from './commands/show.js';
 import { whoamiCommand } from './commands/whoami.js';
 import { formatError } from './lib/errors.js';
@@ -64,6 +65,14 @@ async function main(): Promise<void> {
         });
 
     program
+        .command('rm')
+        .description('Remove one note by id or select multiple notes in a TTY')
+        .argument('[id]', 'note id')
+        .action(async (id?: string) => {
+            await removeNoteCommand(id);
+        });
+
+    program
         .command('show')
         .description('Show a single note by id')
         .argument('<id>', 'note id')
@@ -84,6 +93,8 @@ async function main(): Promise<void> {
             '  $ drafty login',
             '  $ drafty edit <id>    # choose body or tags',
             '  $ drafty list',
+            '  $ drafty rm <id>',
+            '  $ drafty rm           # interactive multi-select in a TTY',
         ].join('\n'),
     );
 
