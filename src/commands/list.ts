@@ -1,7 +1,6 @@
 import select from '@inquirer/select';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { createNotesClient, requireAuthenticatedSession } from '../lib/auth.js';
 import {
     formatNoteEditMessages,
     formatTags,
@@ -10,12 +9,12 @@ import {
     summarizeNoteBody,
     type NoteSummary,
 } from '../lib/notes.js';
+import { createNotesClient } from '../lib/supabase.js';
 import type { Database } from '../types/database.types.js';
 import { isPromptCancellation, promptForNoteEdit } from './interactive-edit.js';
 
 export async function listNotesCommand(): Promise<void> {
-    const session = await requireAuthenticatedSession();
-    const supabase = createNotesClient(session);
+    const supabase = createNotesClient();
 
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
         const data = await listNotes(supabase);

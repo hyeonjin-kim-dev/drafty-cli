@@ -1,201 +1,123 @@
 # Drafty CLI
 
-Drafty is a cross-platform CLI note app built with TypeScript, Commander, and Supabase.
+> Capture notes from your terminal and sync them to your own Supabase project.
 
-The MVP flow is:
+[![npm version](https://img.shields.io/npm/v/drafty-cli)](https://www.npmjs.com/package/drafty-cli)
+[![license](https://img.shields.io/npm/l/drafty-cli)](LICENSE)
+[![node](https://img.shields.io/node/v/drafty-cli)](package.json)
 
-1. Sign in with an emailed 6-digit code.
-2. Open a system editor for note entry.
-3. Save the note to Supabase with the current user id and normalized tags.
-4. List active notes by default, or show any note by id including archived notes.
+## Features
 
-In an interactive terminal, `drafty list` opens a note picker so you can choose whether to edit an existing note body or its tags.
-
-`drafty rm <id>` archives a single note after confirmation. In a TTY, `drafty rm` opens a multi-select checkbox UI so you can archive several active notes at once.
-
-Archived notes are hidden from `drafty list`, remain visible via `drafty show <id>`, and cannot be edited.
-
-Drafty does not support a browser redirect login flow. The login email must contain a code that you paste back into the terminal.
-
-## Requirements
-
-- Node.js 20 or later
-- npm
-- A Supabase project with Auth enabled
-
-## Environment
-
-Copy .env.example to .env and set the values below.
-
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_PROJECT_ID=your-project-id
-```
-
-SUPABASE_PROJECT_ID is used by `npm run db:types`. If you already ran `npx supabase link`, Drafty can also reuse the linked project ref.
+- **Setup wizard** — `drafty login` saves your Supabase URL, anon key, and project id to a per-user config file
+- **System editor flow** — opens `$VISUAL`, `$EDITOR`, VS Code, Notepad, or vim
+- **Tag-first capture** — attach tags as positional arguments such as `drafty work idea`
+- **Interactive TTY menus** — arrow-key picker for listing, editing, and removing notes
+- **Soft delete** — archived notes stay visible through `drafty show <id>`
+- **Cross-platform** — Windows, macOS, Linux
 
 ## Install
 
 ```bash
-npm install
-npm run build
+npm install -g drafty-cli
 ```
 
-## Local development
+Requires Node.js 20+.
 
-For day-to-day development, you do not need `npm link`.
-
-Run the CLI directly from source:
+## Quick start
 
 ```bash
-npm run dev -- --help
-npm run dev -- login
-npm run dev -- whoami
-npm run dev -- work idea
+drafty login          # save SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_PROJECT_ID
+drafty work idea      # open editor -> save note with tags
+drafty list           # browse notes interactively in a TTY
+drafty show <id>      # inspect a note, including archived notes
+drafty rm <id>        # archive a note
 ```
 
-Run the built CLI:
+## Configuration
 
-```bash
-npm run build
-npm run cli -- --help
-npm run cli -- login
-```
+Drafty needs three Supabase values:
 
-If you want the global `drafty` command in your shell, link it explicitly:
+| Variable              | Description                                                                      |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `SUPABASE_URL`        | Your Supabase project URL                                                        |
+| `SUPABASE_ANON_KEY`   | Your Supabase anon key                                                           |
+| `SUPABASE_PROJECT_ID` | Your Supabase project ref, used by repository tooling such as `npm run db:types` |
 
-```bash
-npm run link:global
-drafty login
-```
+Run `drafty login` to save these values into the per-user config file that Drafty already reads.
 
-Useful scripts:
+Drafty resolves configuration in this order:
 
-```bash
-npm run check
-npm run dev:watch -- --help
-```
+1. Shell environment variables
+2. `.env` in the current working directory
+3. Per-user config file written by `drafty login`
 
-## Supabase Auth setup
+Per-user config paths:
 
-Drafty uses `supabase.auth.signInWithOtp()` plus `verifyOtp({ type: 'email' })`, so the hosted Auth project must send a token-based email instead of a browser-first magic link.
+- Windows: `%APPDATA%\Drafty\.env`
+- macOS / Linux: `~/.config/drafty/.env`
 
-The repository now includes a checked-in Auth config and email templates:
-
-- [supabase/config.toml](supabase/config.toml)
-- [supabase/templates/confirmation.html](supabase/templates/confirmation.html)
-- [supabase/templates/magic_link.html](supabase/templates/magic_link.html)
-
-Apply the Auth configuration to the linked Supabase project:
-
-```bash
-npx supabase config push
-```
-
-The intended hosted Auth behavior is:
-
-1. `auth.site_url` points to a neutral landing page instead of localhost.
-2. `auth.email.enable_confirmations` stays enabled for new-user confirmation.
-3. `magic_link` and `confirmation` templates render `{{ .Token }}` and explicitly tell users to paste the code into Drafty.
-4. Browser-only `{{ .ConfirmationURL }}` buttons are removed from login emails.
+`drafty logout` removes the saved per-user config and also cleans up any legacy `session.json` file left behind by older releases.
 
 ## Commands
 
+| Command            | Description                                                          |
+| ------------------ | -------------------------------------------------------------------- |
+| `drafty [tags...]` | Open an editor and save a new note with optional tags                |
+| `drafty login`     | Run the setup wizard and save local Supabase config                  |
+| `drafty logout`    | Remove the saved local config and any legacy session file            |
+| `drafty list`      | List active notes; interactive picker in a TTY, plain text otherwise |
+| `drafty show <id>` | Show a single note, including archived notes                         |
+| `drafty edit <id>` | Edit a note body or its tags                                         |
+| `drafty rm [id]`   | Archive one note by id, or multi-select notes in a TTY               |
+
+## Editor
+
+Drafty uses the first available editor:
+
+1. `$VISUAL`
+2. `$EDITOR`
+3. `notepad` on Windows or `vim` on macOS and Linux
+
+Example override:
+
 ```bash
-npm run dev -- login
-npm run dev -- logout
-npm run dev -- whoami
-npm run dev -- list
-npm run dev -- edit <id>
-npm run dev -- rm <id>
-npm run dev -- rm
-npm run dev -- show <id>
-npm run dev -- work idea
+export EDITOR="code --wait"
 ```
 
-`drafty edit <id>` prompts you to edit either the existing note body or its tags.
+## Supabase setup
 
-`drafty rm <id>` confirms once, then soft deletes the note by changing its status to `archived`.
-
-`drafty rm` is TTY-only and opens a checkbox selector for removing multiple active notes in one pass.
-
-`drafty list` behaves differently based on the output mode:
-
-1. In a TTY, it opens an arrow-key picker over active notes, then lets you choose whether to edit the selected note body or tags.
-2. In a non-TTY context such as piping or redirection, it falls back to the plain text list output for active notes.
-
-`drafty show <id>` still works for archived notes so you can inspect soft-deleted content later.
-
-Tags are passed as positional arguments. Drafty also strips a leading # if you accidentally use the older syntax.
-
-## Editor selection
-
-Drafty opens the first available editor from the list below.
-
-1. VISUAL
-2. EDITOR
-3. notepad on Windows
-4. vim on macOS and Linux
-
-No extra setup is required for the default case. On Windows, Drafty falls back to the system Notepad automatically.
-
-If you want a custom editor, set VISUAL or EDITOR to the full command. Examples:
+Drafty now assumes a single-user project model. The npm package does not create the database schema for you. Bootstrap a new Supabase project from this repository:
 
 ```bash
-set EDITOR=C:\Program Files\Notepad++\notepad++.exe
-set EDITOR=code --wait
-```
-
-## Session storage
-
-- Windows: %APPDATA%/Drafty/session.json
-- macOS/Linux: XDG_CONFIG_HOME/drafty/session.json or ~/.config/drafty/session.json
-
-## Login troubleshooting
-
-If `drafty login` sends an email with a button or redirect link instead of a 6-digit code, the Supabase Auth templates are still configured for browser login.
-
-Use this checklist:
-
-1. Run `npx supabase config push` from this repository.
-2. In Supabase Dashboard, confirm `Authentication > URL Configuration > SITE_URL` is not a localhost placeholder.
-3. In `Authentication > Email Templates`, confirm both `Magic Link` and `Confirm sign up` emails show `{{ .Token }}` content rather than a `{{ .ConfirmationURL }}` link.
-4. Test both a new email address and an existing confirmed account with `npm run dev -- login`.
-
-If the email still arrives as a link-only message, inspect the hosted template that was sent and compare it with [supabase/templates/confirmation.html](supabase/templates/confirmation.html) and [supabase/templates/magic_link.html](supabase/templates/magic_link.html).
-
-## Database setup
-
-The initial notes table and RLS policies live in [supabase/migrations/20260315000000_create_notes.sql](supabase/migrations/20260315000000_create_notes.sql).
-
-Link the local repository to your Supabase project once:
-
-```bash
-npx supabase login
-npx supabase link --project-ref <your-project-ref>
-```
-
-Apply the migration with the Supabase CLI:
-
-```bash
-npm run db:push
-```
-
-Generate fresh TypeScript database types when your schema changes:
-
-```bash
-npm run db:types
-```
-
-Recommended first-run flow:
-
-```bash
+git clone https://github.com/hyeonjin-kim-dev/drafty-cli.git
+cd drafty-cli
 npm install
 npx supabase login
 npx supabase link --project-ref <your-project-ref>
 npm run db:push
 npm run db:types
-npx supabase config push
-npm run dev -- login
 ```
+
+The current schema uses a single `notes` table with anon-key access and an active or archived lifecycle.
+
+## Troubleshooting
+
+**`Drafty is not configured` appears?**
+
+Run `drafty login`, or provide `SUPABASE_URL` and `SUPABASE_ANON_KEY` through your shell or local `.env`.
+
+**`missing the latest Drafty schema` appears?**
+
+Your Supabase project still has the old authenticated schema or is missing the checked-in migrations. Run `npm run db:push` from this repository and try again.
+
+**`Supabase rejected these credentials` appears?**
+
+Re-run `drafty login` and verify the saved URL and anon key.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, project structure, and conventions.
+
+## License
+
+[MIT](LICENSE)

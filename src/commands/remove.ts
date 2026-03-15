@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { createNotesClient, requireAuthenticatedSession } from '../lib/auth.js';
 import { DraftyError } from '../lib/errors.js';
 import {
     archiveNote,
@@ -13,6 +12,7 @@ import {
     type ArchiveNoteResult,
     type NoteSummary,
 } from '../lib/notes.js';
+import { createNotesClient } from '../lib/supabase.js';
 import type { Database } from '../types/database.types.js';
 import {
     promptForNoteRemovalConfirmation,
@@ -20,8 +20,7 @@ import {
 } from './interactive-remove.js';
 
 export async function removeNoteCommand(id?: string): Promise<void> {
-    const session = await requireAuthenticatedSession();
-    const supabase = createNotesClient(session);
+    const supabase = createNotesClient();
 
     if (id) {
         await removeSingleNote(supabase, id);
@@ -193,7 +192,9 @@ function printResultDetails(
             continue;
         }
 
-        console.log(`- ${summarizeNoteBody(note.body, 56)} (${shortNoteId(note.id)})`);
+        console.log(
+            `- ${summarizeNoteBody(note.body, 56)} (${shortNoteId(note.id)})`,
+        );
     }
 }
 

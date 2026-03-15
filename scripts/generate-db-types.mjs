@@ -1,8 +1,11 @@
-import "dotenv/config";
-
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import os from "node:os";
+import { dirname, join, resolve } from "node:path";
+
+import { config as loadDotenv } from "dotenv";
+
+loadDraftyEnv();
 
 const projectId = resolveProjectId();
 
@@ -38,4 +41,25 @@ function resolveProjectId() {
 
     const linkedProjectId = readFileSync(linkedProjectPath, "utf8").trim();
     return linkedProjectId || undefined;
+}
+
+function loadDraftyEnv() {
+    loadDotenv({ quiet: true });
+    loadDotenv({
+        path: join(getConfigRootDirectory(), getDraftyConfigDirectoryName(), ".env"),
+        override: false,
+        quiet: true,
+    });
+}
+
+function getConfigRootDirectory() {
+    if (process.platform === "win32") {
+        return process.env.APPDATA?.trim() || join(os.homedir(), "AppData", "Roaming");
+    }
+
+    return process.env.XDG_CONFIG_HOME?.trim() || join(os.homedir(), ".config");
+}
+
+function getDraftyConfigDirectoryName() {
+    return process.platform === "win32" ? "Drafty" : "drafty";
 }

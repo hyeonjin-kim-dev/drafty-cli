@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 
-import 'dotenv/config';
-
 import { Command } from 'commander';
 
 import { captureCommand } from './commands/capture.js';
@@ -11,8 +9,10 @@ import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
 import { removeNoteCommand } from './commands/remove.js';
 import { showNoteCommand } from './commands/show.js';
-import { whoamiCommand } from './commands/whoami.js';
+import { loadDraftyEnv } from './lib/config.js';
 import { formatError } from './lib/errors.js';
+
+loadDraftyEnv();
 
 async function main(): Promise<void> {
     const program = new Command();
@@ -28,25 +28,16 @@ async function main(): Promise<void> {
 
     program
         .command('login')
-        .description(
-            'Request an email sign-in code and enter it in the terminal',
-        )
+        .description('Save your Supabase URL, anon key, and project id')
         .action(async () => {
             await loginCommand();
         });
 
     program
         .command('logout')
-        .description('Remove the local Drafty session')
+        .description('Remove the saved Drafty config')
         .action(async () => {
             await logoutCommand();
-        });
-
-    program
-        .command('whoami')
-        .description('Show the current logged-in account')
-        .action(async () => {
-            await whoamiCommand();
         });
 
     program
@@ -84,9 +75,9 @@ async function main(): Promise<void> {
         'after',
         [
             '',
-            'Auth:',
-            '  Drafty expects a 6-digit code in the email, not a browser redirect.',
-            '  If the email only contains a link, fix your Supabase Email Templates.',
+            'Setup:',
+            '  Run `drafty login` once to save SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_PROJECT_ID.',
+            '  Apply the checked-in Supabase migrations before using Drafty against a new project.',
             '',
             'Examples:',
             '  $ drafty work idea',

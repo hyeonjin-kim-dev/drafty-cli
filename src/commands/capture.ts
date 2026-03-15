@@ -1,11 +1,10 @@
-import { createNotesClient, requireAuthenticatedSession } from '../lib/auth.js';
 import { wrapSupabaseError } from '../lib/errors.js';
 import { normalizeNoteBody } from '../lib/notes.js';
 import { openEditor } from '../lib/editor.js';
 import { parseTags } from '../lib/parse-tags.js';
+import { createNotesClient } from '../lib/supabase.js';
 
 export async function captureCommand(rawTags: string[]): Promise<void> {
-    const session = await requireAuthenticatedSession();
     const tags = parseTags(rawTags);
     const draftedBody = await openEditor();
     const noteBody = normalizeNoteBody(draftedBody);
@@ -15,11 +14,10 @@ export async function captureCommand(rawTags: string[]): Promise<void> {
         return;
     }
 
-    const supabase = createNotesClient(session);
+    const supabase = createNotesClient();
     const { data, error } = await supabase
         .from('notes')
         .insert({
-            user_id: session.userId,
             body: noteBody,
             cli_tags: tags,
             status: 'active',

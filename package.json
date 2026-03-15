@@ -1,25 +1,45 @@
 {
     "name": "drafty-cli",
     "version": "0.1.0",
-    "description": "Cross-platform CLI note capture with Supabase auth",
-    "private": true,
+    "description": "Cross-platform CLI note capture with user-owned Supabase projects",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/hyeonjin-kim-dev/drafty-cli.git"
+    },
+    "homepage": "https://github.com/hyeonjin-kim-dev/drafty-cli#readme",
+    "bugs": {
+        "url": "https://github.com/hyeonjin-kim-dev/drafty-cli/issues"
+    },
+    "license": "MIT",
+    "keywords": [
+        "cli",
+        "notes",
+        "supabase",
+        "terminal",
+        "typescript"
+    ],
     "type": "module",
     "bin": {
         "drafty": "dist/cli.js"
     },
     "files": [
-        "dist"
+        "dist",
+        "LICENSE"
     ],
+    "publishConfig": {
+        "access": "public"
+    },
     "engines": {
         "node": ">=20.0.0"
     },
     "scripts": {
-        "build": "tsc -p tsconfig.json",
+        "build": "node scripts/clean-dist.mjs && tsc -p tsconfig.json",
         "cli": "node dist/cli.js",
         "dev": "tsx src/cli.ts",
         "dev:watch": "tsx watch src/cli.ts",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "check": "npm run typecheck && npm run build",
+        "prepack": "npm run check",
         "link:global": "npm link",
         "db:push": "npx supabase db push",
         "db:types": "node scripts/generate-db-types.mjs"

@@ -36,23 +36,34 @@ export function wrapSupabaseError(
     }
 
     if (
-        normalizedMessage.includes('invalid otp') ||
-        normalizedMessage.includes('token has expired')
+        normalizedMessage.includes('invalid api key') ||
+        normalizedMessage.includes('invalid jwt') ||
+        normalizedMessage.includes('jwt malformed') ||
+        error.status === 401
     ) {
         return new DraftyError(
-            'The email code is invalid or expired. Run `drafty login` again.',
+            'Supabase rejected these credentials. Check your saved URL and anon key, then run `drafty login` again.',
         );
     }
 
     if (normalizedMessage.includes('email rate limit')) {
         return new DraftyError(
-            'Too many sign-in code requests. Wait a moment and try again.',
+            'Supabase temporarily rejected repeated requests. Wait a moment and try again.',
         );
     }
 
-    if (error.status === 401) {
+    if (
+        normalizedMessage.includes('could not find the table') ||
+        normalizedMessage.includes('relation "public.notes" does not exist') ||
+        normalizedMessage.includes('permission denied for table notes') ||
+        normalizedMessage.includes(
+            'row-level security policy for table "notes"',
+        ) ||
+        normalizedMessage.includes('null value in column "user_id"') ||
+        normalizedMessage.includes('column "user_id"')
+    ) {
         return new DraftyError(
-            'Authentication failed. Run `drafty login` again.',
+            'Your Supabase project is missing the latest Drafty schema. Apply the repository migrations, then run `drafty login` again.',
         );
     }
 

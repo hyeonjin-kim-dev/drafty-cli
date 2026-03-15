@@ -1,10 +1,9 @@
-import { createNotesClient, requireAuthenticatedSession } from '../lib/auth.js';
 import { DraftyError } from '../lib/errors.js';
 import { formatTags, formatTimestamp, getNoteById } from '../lib/notes.js';
+import { createNotesClient } from '../lib/supabase.js';
 
 export async function showNoteCommand(id: string): Promise<void> {
-    const session = await requireAuthenticatedSession();
-    const supabase = createNotesClient(session);
+    const supabase = createNotesClient();
     const data = await getNoteById(supabase, id);
 
     if (!data) {

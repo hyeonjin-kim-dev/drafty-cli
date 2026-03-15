@@ -1,12 +1,28 @@
-import { logoutLocalSession } from '../lib/auth.js';
+import {
+    deleteLegacySessionFile,
+    deleteSavedSupabaseConfig,
+} from '../lib/config.js';
 
 export async function logoutCommand(): Promise<void> {
-    const hadSession = await logoutLocalSession();
+    const [removedConfig, removedSession] = await Promise.all([
+        deleteSavedSupabaseConfig(),
+        deleteLegacySessionFile(),
+    ]);
 
-    if (!hadSession) {
-        console.log('No local session was found.');
+    if (!removedConfig && !removedSession) {
+        console.log('No local Drafty config was found.');
         return;
     }
 
-    console.log('Logged out.');
+    if (removedConfig && removedSession) {
+        console.log('Removed the saved Drafty config and legacy session file.');
+        return;
+    }
+
+    if (removedConfig) {
+        console.log('Removed the saved Drafty config.');
+        return;
+    }
+
+    console.log('Removed the legacy session file.');
 }
