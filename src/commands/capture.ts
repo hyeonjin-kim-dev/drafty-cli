@@ -1,5 +1,6 @@
 import { createNotesClient, requireAuthenticatedSession } from '../lib/auth.js';
 import { wrapSupabaseError } from '../lib/errors.js';
+import { normalizeNoteBody } from '../lib/notes.js';
 import { openEditor } from '../lib/editor.js';
 import { parseTags } from '../lib/parse-tags.js';
 
@@ -7,7 +8,7 @@ export async function captureCommand(rawTags: string[]): Promise<void> {
     const session = await requireAuthenticatedSession();
     const tags = parseTags(rawTags);
     const draftedBody = await openEditor();
-    const noteBody = draftedBody.replace(/\s+$/u, '');
+    const noteBody = normalizeNoteBody(draftedBody);
 
     if (!noteBody.trim()) {
         console.log('Empty note. Nothing was saved.');

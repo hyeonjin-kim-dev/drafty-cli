@@ -9,6 +9,8 @@ The MVP flow is:
 3. Save the note to Supabase with the current user id and normalized tags.
 4. List or show notes that belong to the logged-in user.
 
+In an interactive terminal, `drafty list` opens a note picker so you can jump straight into editing an existing note body.
+
 Drafty does not support a browser redirect login flow. The login email must contain a code that you paste back into the terminal.
 
 ## Requirements
@@ -101,9 +103,17 @@ npm run dev -- login
 npm run dev -- logout
 npm run dev -- whoami
 npm run dev -- list
+npm run dev -- edit <id>
 npm run dev -- show <id>
 npm run dev -- work idea
 ```
+
+`drafty edit <id>` edits the existing note body and keeps tags unchanged.
+
+`drafty list` behaves differently based on the output mode:
+
+1. In a TTY, it opens an arrow-key picker and pressing Enter opens the selected note in your editor.
+2. In a non-TTY context such as piping or redirection, it falls back to the plain text list output.
 
 Tags are passed as positional arguments. Drafty also strips a leading # if you accidentally use the older syntax.
 

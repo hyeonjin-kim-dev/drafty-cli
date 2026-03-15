@@ -5,6 +5,7 @@ import 'dotenv/config';
 import { Command } from 'commander';
 
 import { captureCommand } from './commands/capture.js';
+import { editNoteCommand } from './commands/edit.js';
 import { listNotesCommand } from './commands/list.js';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
@@ -49,9 +50,17 @@ async function main(): Promise<void> {
 
     program
         .command('list')
-        .description('List recent notes for the current account')
+        .description('List recent notes or choose one to edit in a TTY')
         .action(async () => {
             await listNotesCommand();
+        });
+
+    program
+        .command('edit')
+        .description('Edit a single note body by id')
+        .argument('<id>', 'note id')
+        .action(async (id: string) => {
+            await editNoteCommand(id);
         });
 
     program
@@ -73,6 +82,7 @@ async function main(): Promise<void> {
             'Examples:',
             '  $ drafty work idea',
             '  $ drafty login',
+            '  $ drafty edit <id>',
             '  $ drafty list',
         ].join('\n'),
     );
