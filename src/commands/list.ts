@@ -1,8 +1,8 @@
 import select from '@inquirer/select';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createNotesClient, requireAuthenticatedSession } from '../lib/auth.js';
 import {
-    editNoteBody,
     formatNoteEditMessages,
     formatTags,
     formatTimestamp,
@@ -10,51 +10,26 @@ import {
     summarizeNoteBody,
     type NoteSummary,
 } from '../lib/notes.js';
+import type { Database } from '../types/database.types.js';
+import { isPromptCancellation, promptForNoteEdit } from './interactive-edit.js';
 
 export async function listNotesCommand(): Promise<void> {
     const session = await requireAuthenticatedSession();
     const supabase = createNotesClient(session);
-    const data = await listNotes(supabase);
-
-    if (data.length === 0) {
-        console.log('No notes found.');
-        return;
-    }
 
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
+        const data = await listNotes(supabase);
+
+        if (data.length === 0) {
+            console.log('No notes found.');
+            return;
+        }
+
         printPlainNoteList(data);
         return;
     }
 
-    try {
-        const selectedNoteId = await select({
-            message: 'Select a note to edit',
-            pageSize: 10,
-            choices: data.map((note) => ({
-                name: summarizeNoteBody(note.body, 64),
-                value: note.id,
-                description: [
-                    formatTimestamp(note.created_at),
-                    `[${note.status}]`,
-                    `Tags: ${formatTags(note.cli_tags)}`,
-                    `ID: ${shortNoteId(note.id)}`,
-                ].join('  '),
-            })),
-        });
-
-        const result = await editNoteBody(supabase, selectedNoteId);
-
-        for (const line of formatNoteEditMessages(result)) {
-            console.log(line);
-        }
-    } catch (error) {
-        if (isPromptCancellation(error)) {
-            console.log('Canceled.');
-            return;
-        }
-
-        throw error;
-    }
+    await runInteractiveListLoop(supabase);
 }
 
 function printPlainNoteList(notes: NoteSummary[]): void {
@@ -67,8 +42,61 @@ function printPlainNoteList(notes: NoteSummary[]): void {
     }
 }
 
-function isPromptCancellation(error: unknown): boolean {
-    return error instanceof Error && error.name === 'ExitPromptError';
+async function runInteractiveListLoop(
+    supabase: SupabaseClient<Database>,
+): Promise<void> {
+    while (true) {
+        const notes = await listNotes(supabase);
+
+        if (notes.length === 0) {
+            console.log('No notes found.');
+            return;
+        }
+
+        const selectedNoteId = await promptForNoteSelection(notes);
+
+        if (!selectedNoteId) {
+            console.log('Canceled.');
+            return;
+        }
+
+        const result = await promptForNoteEdit(supabase, selectedNoteId);
+
+        if (!result) {
+            continue;
+        }
+
+        for (const line of formatNoteEditMessages(result)) {
+            console.log(line);
+        }
+    }
+}
+
+async function promptForNoteSelection(
+    notes: NoteSummary[],
+): Promise<string | null> {
+    try {
+        return await select<string>({
+            message: 'Select a note to edit',
+            pageSize: 10,
+            choices: notes.map((note) => ({
+                name: summarizeNoteBody(note.body, 64),
+                value: note.id,
+                description: [
+                    formatTimestamp(note.created_at),
+                    `[${note.status}]`,
+                    `Tags: ${formatTags(note.cli_tags)}`,
+                    `ID: ${shortNoteId(note.id)}`,
+                ].join('  '),
+            })),
+        });
+    } catch (error) {
+        if (isPromptCancellation(error)) {
+            return null;
+        }
+
+        throw error;
+    }
 }
 
 function shortNoteId(id: string): string {

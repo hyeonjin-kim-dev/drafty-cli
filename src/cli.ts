@@ -50,14 +50,14 @@ async function main(): Promise<void> {
 
     program
         .command('list')
-        .description('List recent notes or choose one to edit in a TTY')
+        .description('List recent notes or choose one to edit in a TTY menu')
         .action(async () => {
             await listNotesCommand();
         });
 
     program
         .command('edit')
-        .description('Edit a single note body by id')
+        .description('Edit a single note body or tags by id')
         .argument('<id>', 'note id')
         .action(async (id: string) => {
             await editNoteCommand(id);
@@ -82,7 +82,7 @@ async function main(): Promise<void> {
             'Examples:',
             '  $ drafty work idea',
             '  $ drafty login',
-            '  $ drafty edit <id>',
+            '  $ drafty edit <id>    # choose body or tags',
             '  $ drafty list',
         ].join('\n'),
     );

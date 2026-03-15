@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database.types.js';
 import { openEditor } from './editor.js';
 import { DraftyError, wrapSupabaseError } from './errors.js';
+import { parseTags } from './parse-tags.js';
 
 export interface NoteSummary {
     id: string;
@@ -18,20 +19,25 @@ interface EditableNote {
     cli_tags: string[];
 }
 
-export interface UpdatedNoteEditResult {
-    outcome: 'updated';
+export type NoteEditTarget = 'body' | 'tags';
+
+interface BaseNoteEditResult {
+    target: NoteEditTarget;
     noteId: string;
     tags: string[];
 }
 
-export interface UnchangedNoteEditResult {
+export interface UpdatedNoteEditResult extends BaseNoteEditResult {
+    outcome: 'updated';
+}
+
+export interface UnchangedNoteEditResult extends BaseNoteEditResult {
     outcome: 'unchanged';
-    noteId: string;
-    tags: string[];
 }
 
 export interface EmptyNoteEditResult {
     outcome: 'empty';
+    target: 'body';
     noteId: string;
     tags: string[];
 }
@@ -67,6 +73,7 @@ export async function editNoteBody(
     if (!nextBody.trim()) {
         return {
             outcome: 'empty',
+            target: 'body',
             noteId: note.id,
             tags: note.cli_tags,
         };
@@ -75,6 +82,7 @@ export async function editNoteBody(
     if (nextBody === note.body) {
         return {
             outcome: 'unchanged',
+            target: 'body',
             noteId: note.id,
             tags: note.cli_tags,
         };
@@ -93,6 +101,43 @@ export async function editNoteBody(
 
     return {
         outcome: 'updated',
+        target: 'body',
+        noteId: data.id,
+        tags: data.cli_tags,
+    };
+}
+
+export async function editNoteTags(
+    supabase: SupabaseClient<Database>,
+    id: string,
+): Promise<NoteEditResult> {
+    const note = await loadEditableNote(supabase, id);
+    const draftedTags = await openEditor(serializeEditableTags(note.cli_tags));
+    const nextTags = normalizeEditableTags(draftedTags);
+
+    if (areTagsEqual(nextTags, note.cli_tags)) {
+        return {
+            outcome: 'unchanged',
+            target: 'tags',
+            noteId: note.id,
+            tags: note.cli_tags,
+        };
+    }
+
+    const { data, error } = await supabase
+        .from('notes')
+        .update({ cli_tags: nextTags })
+        .eq('id', note.id)
+        .select('id, cli_tags')
+        .single();
+
+    if (error) {
+        throw wrapSupabaseError('Failed to update the note tags', error);
+    }
+
+    return {
+        outcome: 'updated',
+        target: 'tags',
         noteId: data.id,
         tags: data.cli_tags,
     };
@@ -100,6 +145,13 @@ export async function editNoteBody(
 
 export function formatNoteEditMessages(result: NoteEditResult): string[] {
     if (result.outcome === 'updated') {
+        if (result.target === 'tags') {
+            return [
+                `Updated tags for note: ${result.noteId}`,
+                `Tags: ${formatTags(result.tags)}`,
+            ];
+        }
+
         return [
             `Updated note: ${result.noteId}`,
             `Tags: ${formatTags(result.tags)}`,
@@ -107,6 +159,10 @@ export function formatNoteEditMessages(result: NoteEditResult): string[] {
     }
 
     if (result.outcome === 'unchanged') {
+        if (result.target === 'tags') {
+            return ['No tag changes. Existing tags were kept.'];
+        }
+
         return ['No changes. Existing note was kept.'];
     }
 
@@ -119,6 +175,16 @@ export function formatTags(tags: string[]): string {
 
 export function normalizeNoteBody(value: string): string {
     return value.replace(/\s+$/u, '');
+}
+
+export function normalizeEditableTags(value: string): string[] {
+    const normalizedValue = value.trim();
+
+    if (!normalizedValue) {
+        return [];
+    }
+
+    return parseTags(normalizedValue.split(/\s+/u));
 }
 
 export function formatTimestamp(value: string): string {
@@ -146,6 +212,17 @@ export function summarizeNoteBody(body: string, maxLength = 72): string {
     }
 
     return `${normalizedBody.slice(0, maxLength - 3).trimEnd()}...`;
+}
+
+function areTagsEqual(left: string[], right: string[]): boolean {
+    return (
+        left.length === right.length &&
+        left.every((tag, index) => tag === right[index])
+    );
+}
+
+function serializeEditableTags(tags: string[]): string {
+    return tags.join(' ');
 }
 
 async function loadEditableNote(
