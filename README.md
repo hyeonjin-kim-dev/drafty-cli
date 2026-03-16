@@ -32,6 +32,7 @@ drafty list           # browse notes interactively in a TTY
 drafty list todo idea # show active notes tagged todo OR idea
 drafty show <id>      # inspect a note, including archived notes
 drafty rm <id>        # archive a note
+drafty update         # update to the latest version
 ```
 
 ## Configuration
@@ -61,15 +62,16 @@ Per-user config paths:
 
 ## Commands
 
-| Command            | Description                                                          |
-| ------------------ | -------------------------------------------------------------------- |
-| `drafty [tags...]` | Open an editor and save a new note with optional tags                |
-| `drafty login`     | Run the setup wizard and save local Supabase config                  |
-| `drafty logout`    | Remove the saved local config and any legacy session file            |
+| Command                 | Description                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `drafty [tags...]`      | Open an editor and save a new note with optional tags                                                               |
+| `drafty login`          | Run the setup wizard and save local Supabase config                                                                 |
+| `drafty logout`         | Remove the saved local config and any legacy session file                                                           |
 | `drafty list [tags...]` | List active notes, optionally filtered by tags with OR semantics; interactive picker in a TTY, plain text otherwise |
-| `drafty show <id>` | Show a single note, including archived notes                         |
-| `drafty edit <id>` | Edit a note body or its tags                                         |
-| `drafty rm [id]`   | Archive one note by id, or multi-select notes in a TTY               |
+| `drafty show <id>`      | Show a single note, including archived notes                                                                        |
+| `drafty edit <id>`      | Edit a note body or its tags                                                                                        |
+| `drafty rm [id]`        | Archive one note by id, or multi-select notes in a TTY                                                              |
+| `drafty update`         | Check for a newer npm version and update; use `--check` to preview without installing                               |
 
 ## Editor
 

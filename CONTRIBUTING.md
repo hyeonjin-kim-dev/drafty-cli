@@ -77,7 +77,7 @@ npm run db:types       # regenerate database.types.ts
 src/
   cli.ts             # Entrypoint, Commander registration, top-level error handling
   commands/          # One file per command
-  lib/               # Core modules (config, supabase, errors, notes, editor, prompt, parse-tags)
+  lib/               # Core modules (config, supabase, errors, notes, editor, prompt, parse-tags, npm-update, package-meta)
   types/             # database.types.ts (generated from Supabase)
 supabase/            # config.toml, migrations
 ```
@@ -100,4 +100,15 @@ npm version patch   # or minor / major
 npm publish
 ```
 
+After publishing, users with a global npm install can update with:
+
+```bash
+drafty update
+```
+
+`drafty update` only works for global npm installs (`npm install -g drafty-cli`). It does not apply Supabase schema changes — users must run `npm run db:push` from the repository if migrations are included in the release.
+
+```
+
 The `prepack` script runs `npm run check` automatically before packaging.
+```

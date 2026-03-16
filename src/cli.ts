@@ -9,8 +9,10 @@ import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
 import { removeNoteCommand } from './commands/remove.js';
 import { showNoteCommand } from './commands/show.js';
+import { updateCommand } from './commands/update.js';
 import { loadDraftyEnv } from './lib/config.js';
 import { formatError } from './lib/errors.js';
+import { PACKAGE_VERSION } from './lib/package-meta.js';
 
 loadDraftyEnv();
 
@@ -20,7 +22,7 @@ async function main(): Promise<void> {
     program
         .name('drafty')
         .description('Capture personal notes from your terminal.')
-        .version('0.1.0')
+        .version(PACKAGE_VERSION)
         .argument('[tags...]', 'tags to attach to the note')
         .action(async (tags: string[] = []) => {
             await captureCommand(tags);
@@ -42,7 +44,9 @@ async function main(): Promise<void> {
 
     program
         .command('list')
-        .description('List recent notes, optionally filtered by tag, or edit in a TTY menu')
+        .description(
+            'List recent notes, optionally filtered by tag, or edit in a TTY menu',
+        )
         .argument('[tags...]', 'filter active notes by tag (matches any tag)')
         .action(async (tags: string[] = []) => {
             await listNotesCommand(tags);
@@ -72,6 +76,14 @@ async function main(): Promise<void> {
             await showNoteCommand(id);
         });
 
+    program
+        .command('update')
+        .description('Check for a newer version and update if available')
+        .option('--check', 'show current and latest version without installing')
+        .action(async (options: { check?: boolean }) => {
+            await updateCommand({ check: options.check ?? false });
+        });
+
     program.addHelpText(
         'after',
         [
@@ -88,6 +100,8 @@ async function main(): Promise<void> {
             '  $ drafty list todo idea',
             '  $ drafty rm <id>',
             '  $ drafty rm           # interactive multi-select in a TTY',
+            '  $ drafty update       # update to the latest version',
+            '  $ drafty update --check  # show available version without installing',
         ].join('\n'),
     );
 
