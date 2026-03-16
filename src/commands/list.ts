@@ -9,15 +9,17 @@ import {
     summarizeNoteBody,
     type NoteSummary,
 } from '../lib/notes.js';
+import { parseTags } from '../lib/parse-tags.js';
 import { createNotesClient } from '../lib/supabase.js';
 import type { Database } from '../types/database.types.js';
 import { isPromptCancellation, promptForNoteEdit } from './interactive-edit.js';
 
-export async function listNotesCommand(): Promise<void> {
+export async function listNotesCommand(rawTags: string[] = []): Promise<void> {
     const supabase = createNotesClient();
+    const tags = parseTags(rawTags);
 
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
-        const data = await listNotes(supabase);
+        const data = await listNotes(supabase, { tags });
 
         if (data.length === 0) {
             console.log('No notes found.');
@@ -28,7 +30,7 @@ export async function listNotesCommand(): Promise<void> {
         return;
     }
 
-    await runInteractiveListLoop(supabase);
+    await runInteractiveListLoop(supabase, tags);
 }
 
 function printPlainNoteList(notes: NoteSummary[]): void {
@@ -42,9 +44,10 @@ function printPlainNoteList(notes: NoteSummary[]): void {
 
 async function runInteractiveListLoop(
     supabase: SupabaseClient<Database>,
+    tags: string[],
 ): Promise<void> {
     while (true) {
-        const notes = await listNotes(supabase);
+        const notes = await listNotes(supabase, { tags });
 
         if (notes.length === 0) {
             console.log('No notes found.');

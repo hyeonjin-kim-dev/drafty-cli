@@ -26,6 +26,7 @@ interface EditableNote {
 
 interface ListNotesOptions {
     includeArchived?: boolean;
+    tags?: string[];
 }
 
 interface ArchiveNoteOptions {
@@ -95,14 +96,17 @@ export async function listNotes(
 ): Promise<NoteSummary[]> {
     let query = supabase
         .from('notes')
-        .select('id, body, cli_tags, status, created_at')
-        .order('created_at', { ascending: false });
+        .select('id, body, cli_tags, status, created_at');
 
     if (!options.includeArchived) {
         query = query.eq('status', ACTIVE_NOTE_STATUS);
     }
 
-    const { data, error } = await query;
+    if (options.tags && options.tags.length > 0) {
+        query = query.overlaps('cli_tags', options.tags);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
         throw wrapSupabaseError('Failed to load notes', error);

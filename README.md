@@ -29,6 +29,7 @@ Requires Node.js 20+.
 drafty login          # save SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_PROJECT_ID
 drafty work idea      # open editor -> save note with tags
 drafty list           # browse notes interactively in a TTY
+drafty list todo idea # show active notes tagged todo OR idea
 drafty show <id>      # inspect a note, including archived notes
 drafty rm <id>        # archive a note
 ```
@@ -65,7 +66,7 @@ Per-user config paths:
 | `drafty [tags...]` | Open an editor and save a new note with optional tags                |
 | `drafty login`     | Run the setup wizard and save local Supabase config                  |
 | `drafty logout`    | Remove the saved local config and any legacy session file            |
-| `drafty list`      | List active notes; interactive picker in a TTY, plain text otherwise |
+| `drafty list [tags...]` | List active notes, optionally filtered by tags with OR semantics; interactive picker in a TTY, plain text otherwise |
 | `drafty show <id>` | Show a single note, including archived notes                         |
 | `drafty edit <id>` | Edit a note body or its tags                                         |
 | `drafty rm [id]`   | Archive one note by id, or multi-select notes in a TTY               |

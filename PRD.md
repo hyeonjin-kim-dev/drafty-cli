@@ -58,7 +58,7 @@ drafty work idea
 
 ### 4.3 메모 조회와 편집
 
-- `drafty list`: active 메모 목록 조회. TTY에서는 편집 진입용 picker 제공
+- `drafty list [tags...]`: active 메모 목록 조회. 태그를 넘기면 OR 조건으로 필터링. TTY에서는 편집 진입용 picker 제공
 - `drafty show <id>`: 단일 메모 조회. archived 메모도 조회 가능
 - `drafty edit <id>`: 본문 또는 태그 편집
 - `drafty rm [id]`: soft delete. `status = 'archived'`로 전환
@@ -81,7 +81,7 @@ drafty logout
 - `drafty [tags...]`
 - `drafty login`
 - `drafty logout`
-- `drafty list`
+- `drafty list [tags...]`
 - `drafty show <id>`
 - `drafty edit <id>`
 - `drafty rm [id]`
@@ -103,7 +103,7 @@ drafty logout
 
 - anon key로 `select`, `insert`, `update`가 가능해야 한다.
 - 삭제는 hard delete가 아니라 archived 상태 전환으로 처리한다.
-- 목록은 active 메모만 기본 노출한다.
+- 목록은 active 메모만 기본 노출하고, 태그 인자가 있으면 해당 태그들 중 하나라도 포함한 메모만 노출한다.
 
 ## 7. 운영 가정
 

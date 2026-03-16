@@ -42,9 +42,10 @@ async function main(): Promise<void> {
 
     program
         .command('list')
-        .description('List recent notes or choose one to edit in a TTY menu')
-        .action(async () => {
-            await listNotesCommand();
+        .description('List recent notes, optionally filtered by tag, or edit in a TTY menu')
+        .argument('[tags...]', 'filter active notes by tag (matches any tag)')
+        .action(async (tags: string[] = []) => {
+            await listNotesCommand(tags);
         });
 
     program
@@ -84,6 +85,7 @@ async function main(): Promise<void> {
             '  $ drafty login',
             '  $ drafty edit <id>    # choose body or tags',
             '  $ drafty list',
+            '  $ drafty list todo idea',
             '  $ drafty rm <id>',
             '  $ drafty rm           # interactive multi-select in a TTY',
         ].join('\n'),
