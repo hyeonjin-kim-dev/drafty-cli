@@ -1,4 +1,3 @@
-import select from '@inquirer/select';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
@@ -12,7 +11,8 @@ import {
 import { parseTags } from '../lib/parse-tags.js';
 import { createNotesClient } from '../lib/supabase.js';
 import type { Database } from '../types/database.types.js';
-import { isPromptCancellation, promptForNoteEdit } from './interactive-edit.js';
+import { promptForNoteSelection } from './interactive-list.js';
+import { promptForNoteEdit } from './interactive-edit.js';
 
 export async function listNotesCommand(rawTags: string[] = []): Promise<void> {
     const supabase = createNotesClient();
@@ -71,34 +71,4 @@ async function runInteractiveListLoop(
             console.log(line);
         }
     }
-}
-
-async function promptForNoteSelection(
-    notes: NoteSummary[],
-): Promise<string | null> {
-    try {
-        return await select<string>({
-            message: 'Select a note to edit',
-            pageSize: 10,
-            choices: notes.map((note) => ({
-                name: summarizeNoteBody(note.body, 64),
-                value: note.id,
-                description: [
-                    formatTimestamp(note.created_at),
-                    `Tags: ${formatTags(note.cli_tags)}`,
-                    `ID: ${shortNoteId(note.id)}`,
-                ].join('  '),
-            })),
-        });
-    } catch (error) {
-        if (isPromptCancellation(error)) {
-            return null;
-        }
-
-        throw error;
-    }
-}
-
-function shortNoteId(id: string): string {
-    return id.slice(0, 8);
 }
