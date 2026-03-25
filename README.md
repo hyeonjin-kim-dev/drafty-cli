@@ -11,7 +11,7 @@
 - **Setup wizard** — `drafty login` saves your Supabase URL, anon key, and project id to a per-user config file
 - **System editor flow** — opens `$VISUAL`, `$EDITOR`, VS Code, Notepad, or vim
 - **Tag-first capture** — attach tags as positional arguments such as `drafty work idea`
-- **Interactive TTY menus** — arrow-key picker for listing, editing, and removing notes
+- **Interactive TTY menus** — arrow-key picker for listing, previewing, editing, and removing notes
 - **Soft delete** — archived notes stay visible through `drafty show <id>`
 - **Cross-platform** — Windows, macOS, Linux
 
@@ -67,7 +67,7 @@ Per-user config paths:
 | `drafty [tags...]`      | Open an editor and save a new note with optional tags                                                               |
 | `drafty login`          | Run the setup wizard and save local Supabase config                                                                 |
 | `drafty logout`         | Remove the saved local config and any legacy session file                                                           |
-| `drafty list [tags...]` | List active notes, optionally filtered by tags with OR semantics; interactive picker in a TTY, plain text otherwise |
+| `drafty list [tags...]` | List active notes, optionally filtered by tags with OR semantics; interactive TTY view includes a preview pane and colored tags |
 | `drafty show <id>`      | Show a single note, including archived notes                                                                        |
 | `drafty edit <id>`      | Edit a note body or its tags                                                                                        |
 | `drafty rm [id]`        | Archive one note by id, or multi-select notes in a TTY                                                              |
