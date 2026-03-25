@@ -1,6 +1,6 @@
 {
     "name": "drafty-cli",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "description": "Cross-platform CLI note capture with user-owned Supabase projects",
     "repository": {
         "type": "git",
