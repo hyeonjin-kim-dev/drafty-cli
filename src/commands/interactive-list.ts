@@ -25,6 +25,22 @@ interface NoteSelectionPromptConfig {
 
 const HIDE_CURSOR = '\u001B[?25l';
 const PANEL_GAP = '   ';
+const MARKDOWN_HEADING_PATTERN = /^(#{1,6})\s+(.*)$/u;
+const MARKDOWN_TASK_PATTERN = /^(\s*)[-*]\s+\[( |x|X)\]\s+(.*)$/u;
+const MARKDOWN_BULLET_PATTERN = /^(\s*)[-*+]\s+(.*)$/u;
+const MARKDOWN_ORDERED_LIST_PATTERN = /^(\s*)(\d+)\.\s+(.*)$/u;
+const MARKDOWN_QUOTE_PATTERN = /^\s*>\s?(.*)$/u;
+const MARKDOWN_RULE_PATTERN = /^([-*_]\s*){3,}$/u;
+const MARKDOWN_ESCAPED_SYMBOL_PATTERN = /\\([\\`*_{}\[\]()#+\-.!>])/gu;
+const MARKDOWN_IMAGE_PATTERN = /!\[([^\]]*)\]\(([^)]+)\)/gu;
+const MARKDOWN_LINK_PATTERN = /\[([^\]]+)\]\(([^)]+)\)/gu;
+const MARKDOWN_INLINE_CODE_PATTERN = /`([^`]+)`/gu;
+const MARKDOWN_SUMMARY_HEADING_PATTERN = /^\s{0,3}#{1,6}\s+/gmu;
+const MARKDOWN_SUMMARY_TASK_PATTERN = /^\s*[-*]\s+\[(?: |x|X)\]\s+/gmu;
+const MARKDOWN_SUMMARY_BULLET_PATTERN = /^\s*[-*+]\s+/gmu;
+const MARKDOWN_SUMMARY_ORDERED_LIST_PATTERN = /^\s*\d+\.\s+/gmu;
+const MARKDOWN_SUMMARY_QUOTE_PATTERN = /^\s*>\s?/gmu;
+const MARKDOWN_FENCE_LINE_PATTERN = /^```.*$/gmu;
 const TAG_COLORS = [
     'red',
     'green',
@@ -293,7 +309,7 @@ function renderMarkdownPreview({
     theme: ReturnType<typeof makeTheme<typeof listPromptTheme>>;
 }): string[] {
     const previewLines: string[] = [];
-    const sourceLines = sanitizeTerminalText(body).replace(/\r\n/gu, '\n').split('\n');
+    const sourceLines = stripControlCharacters(body).replace(/\r\n/gu, '\n').split('\n');
     let isCodeBlock = false;
 
     for (const sourceLine of sourceLines) {
@@ -333,7 +349,7 @@ function renderMarkdownPreview({
             continue;
         }
 
-        const headingMatch = /^(#{1,6})\s+(.*)$/u.exec(trimmedLine);
+        const headingMatch = MARKDOWN_HEADING_PATTERN.exec(trimmedLine);
 
         if (headingMatch) {
             const [, headingMarkers = '', headingText = ''] = headingMatch;
@@ -346,7 +362,7 @@ function renderMarkdownPreview({
             continue;
         }
 
-        const taskMatch = /^(\s*)[-*]\s+\[( |x|X)\]\s+(.*)$/u.exec(sourceLine);
+        const taskMatch = MARKDOWN_TASK_PATTERN.exec(sourceLine);
 
         if (taskMatch) {
             const [, , checkedMarker = '', taskText = ''] = taskMatch;
@@ -365,7 +381,7 @@ function renderMarkdownPreview({
             continue;
         }
 
-        const bulletMatch = /^(\s*)[-*+]\s+(.*)$/u.exec(sourceLine);
+        const bulletMatch = MARKDOWN_BULLET_PATTERN.exec(sourceLine);
 
         if (bulletMatch) {
             const [, rawIndent = '', bulletText = ''] = bulletMatch;
@@ -384,7 +400,7 @@ function renderMarkdownPreview({
             continue;
         }
 
-        const orderedListMatch = /^(\s*)(\d+)\.\s+(.*)$/u.exec(sourceLine);
+        const orderedListMatch = MARKDOWN_ORDERED_LIST_PATTERN.exec(sourceLine);
 
         if (orderedListMatch) {
             const [, rawIndent = '', orderNumber = '1', orderedText = ''] =
@@ -405,7 +421,7 @@ function renderMarkdownPreview({
             continue;
         }
 
-        const quoteMatch = /^\s*>\s?(.*)$/u.exec(sourceLine);
+        const quoteMatch = MARKDOWN_QUOTE_PATTERN.exec(sourceLine);
 
         if (quoteMatch) {
             const [, quoteText = ''] = quoteMatch;
@@ -424,7 +440,7 @@ function renderMarkdownPreview({
             continue;
         }
 
-        if (/^([-*_]\s*){3,}$/u.test(trimmedLine)) {
+        if (MARKDOWN_RULE_PATTERN.test(trimmedLine)) {
             appendLines(
                 previewLines,
                 [theme.style.rule('─'.repeat(width))],
@@ -613,8 +629,12 @@ function collectUniqueTags(notes: NoteSummary[]): string[] {
 
 function renderTag(tag: string): string {
     const cleanTag = sanitizeInlineMarkdown(tag);
-    const color =
-        TAG_COLORS[Math.abs(hashText(cleanTag)) % TAG_COLORS.length] ?? 'cyan';
+    const colorIndex = Math.abs(hashText(cleanTag)) % TAG_COLORS.length;
+    const color = TAG_COLORS[colorIndex];
+
+    if (!color) {
+        return `#${cleanTag}`;
+    }
 
     return styleText(color, `#${cleanTag}`);
 }
@@ -629,7 +649,7 @@ function hashText(value: string): number {
     return hash;
 }
 
-function sanitizeTerminalText(value: string): string {
+function stripControlCharacters(value: string): string {
     return stripVTControlCharacters(value).replace(
         /[\u0000-\u0008\u000B-\u001A\u001C-\u001F\u007F]/gu,
         '',
@@ -637,22 +657,22 @@ function sanitizeTerminalText(value: string): string {
 }
 
 function sanitizeInlineMarkdown(value: string): string {
-    return sanitizeTerminalText(value)
-        .replace(/\\([\\`*_{}\[\]()#+\-.!>])/gu, '$1')
-        .replace(/!\[([^\]]*)\]\(([^)]+)\)/gu, '$1 [$2]')
-        .replace(/\[([^\]]+)\]\(([^)]+)\)/gu, '$1 ($2)')
-        .replace(/`([^`]+)`/gu, '$1')
+    return stripControlCharacters(value)
+        .replace(MARKDOWN_ESCAPED_SYMBOL_PATTERN, '$1')
+        .replace(MARKDOWN_IMAGE_PATTERN, '$1 [$2]')
+        .replace(MARKDOWN_LINK_PATTERN, '$1 ($2)')
+        .replace(MARKDOWN_INLINE_CODE_PATTERN, '$1')
         .trim();
 }
 
 function extractPlainTextSummary(value: string): string {
     return sanitizeInlineMarkdown(value)
-        .replace(/^\s{0,3}#{1,6}\s+/gmu, '')
-        .replace(/^\s*[-*]\s+\[(?: |x|X)\]\s+/gmu, '')
-        .replace(/^\s*[-*+]\s+/gmu, '')
-        .replace(/^\s*\d+\.\s+/gmu, '')
-        .replace(/^\s*>\s?/gmu, '')
-        .replace(/^```.*$/gmu, '')
+        .replace(MARKDOWN_SUMMARY_HEADING_PATTERN, '')
+        .replace(MARKDOWN_SUMMARY_TASK_PATTERN, '')
+        .replace(MARKDOWN_SUMMARY_BULLET_PATTERN, '')
+        .replace(MARKDOWN_SUMMARY_ORDERED_LIST_PATTERN, '')
+        .replace(MARKDOWN_SUMMARY_QUOTE_PATTERN, '')
+        .replace(MARKDOWN_FENCE_LINE_PATTERN, '')
         .replace(/\n+/gu, ' ')
         .trim();
 }
@@ -679,9 +699,14 @@ function appendWrappedLines(
     } = {},
 ): void {
     const wrappedLines = wrapText(value, width, options);
-    const styledLines = options.style
-        ? wrappedLines.map((line) => options.style?.(line) ?? line)
-        : wrappedLines;
+
+    if (!options.style) {
+        appendLines(target, wrappedLines, maxLines);
+        return;
+    }
+
+    const style = options.style;
+    const styledLines = wrappedLines.map((line) => style(line));
 
     appendLines(target, styledLines, maxLines);
 }
@@ -696,7 +721,7 @@ function wrapText(
 ): string[] {
     const firstPrefix = options.firstPrefix ?? '';
     const nextPrefix = options.nextPrefix ?? firstPrefix;
-    const normalizedValue = sanitizeTerminalText(value).replace(/\s+/gu, ' ').trim();
+    const normalizedValue = stripControlCharacters(value).replace(/\s+/gu, ' ').trim();
 
     if (!normalizedValue) {
         return [firstPrefix.trimEnd()];
@@ -708,7 +733,7 @@ function wrapText(
     let currentWidth = visibleLength(firstPrefix);
 
     for (const word of words) {
-        const cleanWord = sanitizeTerminalText(word);
+        const cleanWord = stripControlCharacters(word);
 
         if (!cleanWord) {
             continue;
@@ -724,7 +749,7 @@ function wrapText(
                 currentWidth = visibleLength(nextPrefix);
             }
 
-            for (const chunk of splitLongWord(cleanWord, maxContentWidth)) {
+            for (const chunk of chunkWordByWidth(cleanWord, maxContentWidth)) {
                 const prefix = lines.length === 0 ? firstPrefix : nextPrefix;
                 lines.push(`${prefix}${chunk}`);
             }
@@ -755,7 +780,7 @@ function wrapText(
     return lines;
 }
 
-function splitLongWord(word: string, width: number): string[] {
+function chunkWordByWidth(word: string, width: number): string[] {
     const chunks: string[] = [];
 
     for (let index = 0; index < word.length; index += width) {
