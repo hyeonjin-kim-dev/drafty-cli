@@ -6,6 +6,7 @@ import { captureCommand } from './commands/capture.js';
 import { editNoteCommand } from './commands/edit.js';
 import { listNotesCommand } from './commands/list.js';
 import { loginCommand } from './commands/login.js';
+import { normalizeMarkdownCommand } from './commands/normalize-markdown.js';
 import { logoutCommand } from './commands/logout.js';
 import { removeNoteCommand } from './commands/remove.js';
 import { showNoteCommand } from './commands/show.js';
@@ -84,6 +85,23 @@ async function main(): Promise<void> {
             await updateCommand({ check: options.check ?? false });
         });
 
+    program
+        .command('normalize-markdown')
+        .description(
+            'Normalize stored notes by repairing escaped markdown symbols and HTML entities in existing data',
+        )
+        .option(
+            '--dry-run',
+            'show how many notes would be updated without writing changes',
+        )
+        .option('--yes', 'apply changes without asking for confirmation')
+        .action(async (options: { dryRun?: boolean; yes?: boolean }) => {
+            await normalizeMarkdownCommand({
+                dryRun: options.dryRun ?? false,
+                yes: options.yes ?? false,
+            });
+        });
+
     program.addHelpText(
         'after',
         [
@@ -102,6 +120,7 @@ async function main(): Promise<void> {
             '  $ drafty rm           # interactive multi-select in a TTY',
             '  $ drafty update       # update to the latest version',
             '  $ drafty update --check  # show available version without installing',
+            '  $ drafty normalize-markdown --dry-run  # preview stored note cleanup',
         ].join('\n'),
     );
 

@@ -1,5 +1,7 @@
 # Contributing to Drafty CLI
 
+[한국어](CONTRIBUTING.ko.md)
+
 ## Prerequisites
 
 - Node.js 20 or later

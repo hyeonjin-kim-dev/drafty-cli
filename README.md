@@ -1,5 +1,7 @@
 # Drafty CLI
 
+[한국어](README.ko.md)
+
 > Capture notes from your terminal and sync them to your own Supabase project.
 
 [![npm version](https://img.shields.io/npm/v/drafty-cli)](https://www.npmjs.com/package/drafty-cli)
@@ -11,7 +13,7 @@
 - **Setup wizard** — `drafty login` saves your Supabase URL, anon key, and project id to a per-user config file
 - **System editor flow** — opens `$VISUAL`, `$EDITOR`, VS Code, Notepad, or vim
 - **Tag-first capture** — attach tags as positional arguments such as `drafty work idea`
-- **Interactive TTY menus** — arrow-key picker for listing, previewing, editing, and removing notes
+- **Interactive TTY menus** — arrow-key picker for listing, previewing, tag filtering, editing, and removing notes
 - **Soft delete** — archived notes stay visible through `drafty show <id>`
 - **Cross-platform** — Windows, macOS, Linux
 
@@ -32,6 +34,7 @@ drafty list           # browse notes interactively in a TTY
 drafty list todo idea # show active notes tagged todo OR idea
 drafty show <id>      # inspect a note, including archived notes
 drafty rm <id>        # archive a note
+drafty normalize-markdown --dry-run # preview stored markdown cleanup
 drafty update         # update to the latest version
 ```
 
@@ -62,16 +65,17 @@ Per-user config paths:
 
 ## Commands
 
-| Command                 | Description                                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `drafty [tags...]`      | Open an editor and save a new note with optional tags                                                               |
-| `drafty login`          | Run the setup wizard and save local Supabase config                                                                 |
-| `drafty logout`         | Remove the saved local config and any legacy session file                                                           |
-| `drafty list [tags...]` | List active notes, optionally filtered by tags with OR semantics; interactive TTY view includes a preview pane and colored tags |
-| `drafty show <id>`      | Show a single note, including archived notes                                                                        |
-| `drafty edit <id>`      | Edit a note body or its tags                                                                                        |
-| `drafty rm [id]`        | Archive one note by id, or multi-select notes in a TTY                                                              |
-| `drafty update`         | Check for a newer npm version and update; use `--check` to preview without installing                               |
+| Command                     | Description                                                                                                                                                                                                                |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `drafty [tags...]`          | Open an editor and save a new note with optional tags                                                                                                                                                                      |
+| `drafty login`              | Run the setup wizard and save local Supabase config                                                                                                                                                                        |
+| `drafty logout`             | Remove the saved local config and any legacy session file                                                                                                                                                                  |
+| `drafty list [tags...]`     | List active notes, optionally filtered by tags with OR semantics; interactive TTY view includes a preview pane, colored tags, top tag filtering with `Tab` or arrow keys, and direct remove shortcuts with `d` or `Delete` |
+| `drafty show <id>`          | Show a single note, including archived notes                                                                                                                                                                               |
+| `drafty edit <id>`          | Edit a note body or its tags                                                                                                                                                                                               |
+| `drafty rm [id]`            | Archive one note by id, or multi-select notes in a TTY                                                                                                                                                                     |
+| `drafty normalize-markdown` | Repair stored markdown by removing escaped markdown symbols such as `\_`, `\[`, `\*`, `1\.` and decoding stored HTML entities such as `&#x20;`; use `--dry-run` to preview and `--yes` to skip confirmation                |
+| `drafty update`             | Check for a newer npm version and update; use `--check` to preview without installing                                                                                                                                      |
 
 ## Editor
 
@@ -86,6 +90,28 @@ Example override:
 ```bash
 export EDITOR="code --wait"
 ```
+
+Windows PowerShell:
+
+```powershell
+$env:EDITOR = "code --wait"
+```
+
+If you are using bash on Windows, set it for the current session with:
+
+```bash
+export EDITOR="code --wait"
+```
+
+Persist it for future terminals on Windows:
+
+```powershell
+setx EDITOR "code --wait"
+```
+
+`setx` does not update the current PowerShell, bash, or already-open VS Code terminal session. Open a new terminal or restart VS Code before expecting it to take effect.
+
+If `code` is not available on your `PATH`, either enable the VS Code shell command during installation, or point `EDITOR` to the full `Code.exe` path with `--wait`.
 
 ## Supabase setup
 

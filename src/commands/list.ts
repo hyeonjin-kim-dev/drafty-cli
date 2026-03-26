@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
+    archiveNote,
     formatNoteEditMessages,
     formatTags,
     formatTimestamp,
@@ -13,6 +14,7 @@ import { createNotesClient } from '../lib/supabase.js';
 import type { Database } from '../types/database.types.js';
 import { promptForNoteSelection } from './interactive-list.js';
 import { promptForNoteEdit } from './interactive-edit.js';
+import { promptForNoteRemovalConfirmation } from './interactive-remove.js';
 
 export async function listNotesCommand(rawTags: string[] = []): Promise<void> {
     const supabase = createNotesClient();
@@ -46,6 +48,8 @@ async function runInteractiveListLoop(
     supabase: SupabaseClient<Database>,
     tags: string[],
 ): Promise<void> {
+    let activeFilterTag: string | null = null;
+
     while (true) {
         const notes = await listNotes(supabase, { tags });
 
@@ -54,14 +58,35 @@ async function runInteractiveListLoop(
             return;
         }
 
-        const selectedNoteId = await promptForNoteSelection(notes);
+        const selection = await promptForNoteSelection(notes, activeFilterTag);
 
-        if (!selectedNoteId) {
+        if (!selection) {
             console.log('Canceled.');
             return;
         }
 
-        const result = await promptForNoteEdit(supabase, selectedNoteId);
+        activeFilterTag = selection.filterTag;
+
+        if (selection.action === 'remove') {
+            const selectedNote = notes.find(
+                (note) => note.id === selection.noteId,
+            );
+
+            if (!selectedNote) {
+                console.log('Selected note is no longer available.');
+                continue;
+            }
+
+            const removed = await removeNoteFromList(supabase, selectedNote);
+
+            if (removed) {
+                continue;
+            }
+
+            continue;
+        }
+
+        const result = await promptForNoteEdit(supabase, selection.noteId);
 
         if (!result) {
             continue;
@@ -71,4 +96,37 @@ async function runInteractiveListLoop(
             console.log(line);
         }
     }
+}
+
+async function removeNoteFromList(
+    supabase: SupabaseClient<Database>,
+    note: NoteSummary,
+): Promise<boolean> {
+    printSingleRemovalPreview(note);
+
+    const confirmed = await promptForNoteRemovalConfirmation([note]);
+
+    if (!confirmed) {
+        console.log('Canceled.');
+        return false;
+    }
+
+    const result = await archiveNote(supabase, note.id, { expectActive: true });
+
+    if (result.outcome === 'archived') {
+        console.log(`Removed note: ${result.noteId}`);
+        return true;
+    }
+
+    console.log('Skipped note because it changed before removal.');
+    return false;
+}
+
+function printSingleRemovalPreview(note: NoteSummary): void {
+    console.log('Selected 1 note:');
+    console.log(`- ${summarizeNoteBody(note.body, 56)}`);
+    console.log(
+        `  ${formatTimestamp(note.created_at)}  Tags: ${formatTags(note.cli_tags)}`,
+    );
+    console.log('');
 }

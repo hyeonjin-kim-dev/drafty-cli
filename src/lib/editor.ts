@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,7 +21,7 @@ export async function openEditor(initialContent = ''): Promise<string> {
         if (result.error) {
             if ((result.error as NodeJS.ErrnoException).code === 'ENOENT') {
                 throw new DraftyError(
-                    `Editor '${editor.command}' was not found. Set VISUAL or EDITOR and try again.`,
+                    buildEditorNotFoundMessage(editor.command),
                 );
             }
 
@@ -58,7 +59,28 @@ function resolveEditorCommand(): { command: string; args: string[] } {
     }
 
     const args = tokens.slice(1);
-    return { command, args };
+
+    return resolveWindowsEditorCommand({ command, args });
+}
+
+function resolveWindowsEditorCommand(editor: {
+    command: string;
+    args: string[];
+}): { command: string; args: string[] } {
+    if (process.platform !== 'win32') {
+        return editor;
+    }
+
+    const vscodeExecutable = resolveWindowsVsCodeExecutable(editor.command);
+
+    if (vscodeExecutable) {
+        return {
+            command: vscodeExecutable,
+            args: editor.args,
+        };
+    }
+
+    return editor;
 }
 
 function resolveFallbackEditor(): string {
@@ -74,6 +96,80 @@ function resolveFallbackEditor(): string {
     }
 
     return path.join(windowsRoot, 'System32', 'notepad.exe');
+}
+
+function resolveWindowsVsCodeExecutable(command: string): string | null {
+    const basename = path.win32.basename(command).toLowerCase();
+
+    if (!isVsCodeCommandName(basename)) {
+        return null;
+    }
+
+    const localAppData = process.env.LOCALAPPDATA?.trim();
+    const programFiles = process.env.PROGRAMFILES?.trim();
+    const programFilesX86 = process.env['PROGRAMFILES(X86)']?.trim();
+    const candidates = basename.includes('insiders')
+        ? [
+              localAppData &&
+                  path.join(
+                      localAppData,
+                      'Programs',
+                      'Microsoft VS Code Insiders',
+                      'Code - Insiders.exe',
+                  ),
+              programFiles &&
+                  path.join(
+                      programFiles,
+                      'Microsoft VS Code Insiders',
+                      'Code - Insiders.exe',
+                  ),
+              programFilesX86 &&
+                  path.join(
+                      programFilesX86,
+                      'Microsoft VS Code Insiders',
+                      'Code - Insiders.exe',
+                  ),
+          ]
+        : [
+              localAppData &&
+                  path.join(
+                      localAppData,
+                      'Programs',
+                      'Microsoft VS Code',
+                      'Code.exe',
+                  ),
+              programFiles &&
+                  path.join(programFiles, 'Microsoft VS Code', 'Code.exe'),
+              programFilesX86 &&
+                  path.join(programFilesX86, 'Microsoft VS Code', 'Code.exe'),
+          ];
+
+    for (const candidate of candidates) {
+        if (candidate && existsSync(candidate)) {
+            return candidate;
+        }
+    }
+
+    return null;
+}
+
+function isVsCodeCommandName(commandName: string): boolean {
+    return (
+        commandName === 'code' ||
+        commandName === 'code.cmd' ||
+        commandName === 'code.exe' ||
+        commandName === 'code-insiders' ||
+        commandName === 'code-insiders.cmd' ||
+        commandName === 'code - insiders.exe'
+    );
+}
+
+function buildEditorNotFoundMessage(command: string): string {
+    if (process.platform === 'win32') {
+        return `Editor '${command}' was not found. Set VISUAL or EDITOR to a valid command. For VS Code on Windows, use 'code --wait' after adding the VS Code CLI to PATH, or point EDITOR to Code.exe with --wait.`;
+    }
+
+    return `Editor '${command}' was not found. Set VISUAL or EDITOR and try again.`;
 }
 
 function splitCommand(value: string): string[] {

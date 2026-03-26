@@ -33,8 +33,37 @@ interface ArchiveNoteOptions {
     expectActive?: boolean;
 }
 
+const ESCAPED_MARKDOWN_SYMBOL_PATTERN = /\\(?=[\\`*_{}\[\]()#+\-.!>~|])/gu;
+const HTML_ENTITY_PATTERN = /&(?:#x[\da-f]+|#\d+|amp|lt|gt|quot|apos|nbsp);/giu;
+
 interface BaseArchiveNoteResult {
     noteId: string;
+}
+
+interface MarkdownNormalizationTarget {
+    id: string;
+    body: string;
+    status: string;
+    updated_at: string;
+}
+
+export interface MarkdownNormalizationCandidate {
+    id: string;
+    body: string;
+    status: string;
+}
+
+export interface MarkdownNormalizationPlan {
+    scannedCount: number;
+    candidateCount: number;
+    candidates: MarkdownNormalizationCandidate[];
+}
+
+export interface MarkdownNormalizationResult {
+    scannedCount: number;
+    updatedCount: number;
+    unchangedCount: number;
+    skippedCount: number;
 }
 
 export interface ArchivedNoteResult extends BaseArchiveNoteResult {
@@ -106,7 +135,9 @@ export async function listNotes(
         query = query.overlaps('cli_tags', options.tags);
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query.order('created_at', {
+        ascending: false,
+    });
 
     if (error) {
         throw wrapSupabaseError('Failed to load notes', error);
@@ -269,6 +300,64 @@ export async function editNoteTags(
     };
 }
 
+export async function planMarkdownNormalization(
+    supabase: SupabaseClient<Database>,
+): Promise<MarkdownNormalizationPlan> {
+    const { scannedCount, candidates } =
+        await collectMarkdownNormalizationTargets(supabase);
+
+    return {
+        scannedCount,
+        candidateCount: candidates.length,
+        candidates: candidates.map(({ id, body, status }) => ({
+            id,
+            body,
+            status,
+        })),
+    };
+}
+
+export async function normalizeStoredMarkdownBodies(
+    supabase: SupabaseClient<Database>,
+): Promise<MarkdownNormalizationResult> {
+    const { scannedCount, candidates } =
+        await collectMarkdownNormalizationTargets(supabase);
+    let updatedCount = 0;
+    let skippedCount = 0;
+
+    for (const candidate of candidates) {
+        const nextBody = normalizeMarkdownForDisplay(candidate.body);
+        const { data, error } = await supabase
+            .from('notes')
+            .update({ body: nextBody })
+            .eq('id', candidate.id)
+            .eq('updated_at', candidate.updated_at)
+            .select('id')
+            .maybeSingle();
+
+        if (error) {
+            throw wrapSupabaseError(
+                'Failed to normalize stored note markdown',
+                error,
+            );
+        }
+
+        if (data) {
+            updatedCount += 1;
+            continue;
+        }
+
+        skippedCount += 1;
+    }
+
+    return {
+        scannedCount,
+        updatedCount,
+        unchangedCount: scannedCount - candidates.length,
+        skippedCount,
+    };
+}
+
 export function formatNoteEditMessages(result: NoteEditResult): string[] {
     if (result.outcome === 'updated') {
         if (result.target === 'tags') {
@@ -300,7 +389,21 @@ export function formatTags(tags: string[]): string {
 }
 
 export function normalizeNoteBody(value: string): string {
-    return value.replace(/\s+$/u, '');
+    return value;
+}
+
+export function normalizeMarkdownForDisplay(value: string): string {
+    return normalizeMarkdownEscapes(decodeHtmlEntities(value));
+}
+
+export function normalizeMarkdownEscapes(value: string): string {
+    return value.replace(ESCAPED_MARKDOWN_SYMBOL_PATTERN, '');
+}
+
+export function decodeHtmlEntities(value: string): string {
+    return value.replace(HTML_ENTITY_PATTERN, (entity) =>
+        decodeHtmlEntity(entity),
+    );
 }
 
 export function normalizeEditableTags(value: string): string[] {
@@ -349,6 +452,99 @@ function areTagsEqual(left: string[], right: string[]): boolean {
 
 function serializeEditableTags(tags: string[]): string {
     return tags.join(' ');
+}
+
+async function collectMarkdownNormalizationTargets(
+    supabase: SupabaseClient<Database>,
+): Promise<{
+    scannedCount: number;
+    candidates: MarkdownNormalizationTarget[];
+}> {
+    const notes = await listMarkdownNormalizationTargets(supabase);
+    const candidates = notes.filter(
+        (note) => normalizeMarkdownForDisplay(note.body) !== note.body,
+    );
+
+    return {
+        scannedCount: notes.length,
+        candidates,
+    };
+}
+
+async function listMarkdownNormalizationTargets(
+    supabase: SupabaseClient<Database>,
+): Promise<MarkdownNormalizationTarget[]> {
+    const pageSize = 200;
+    const notes: MarkdownNormalizationTarget[] = [];
+    let fromIndex = 0;
+
+    while (true) {
+        const { data, error } = await supabase
+            .from('notes')
+            .select('id, body, status, updated_at')
+            .order('created_at', { ascending: false })
+            .range(fromIndex, fromIndex + pageSize - 1);
+
+        if (error) {
+            throw wrapSupabaseError(
+                'Failed to load notes for markdown normalization',
+                error,
+            );
+        }
+
+        const page = data ?? [];
+
+        if (page.length === 0) {
+            break;
+        }
+
+        notes.push(...page);
+
+        if (page.length < pageSize) {
+            break;
+        }
+
+        fromIndex += pageSize;
+    }
+
+    return notes;
+}
+
+function decodeHtmlEntity(entity: string): string {
+    const normalizedEntity = entity.toLowerCase();
+
+    if (normalizedEntity.startsWith('&#x')) {
+        const codePoint = Number.parseInt(normalizedEntity.slice(3, -1), 16);
+
+        return Number.isNaN(codePoint)
+            ? entity
+            : String.fromCodePoint(codePoint);
+    }
+
+    if (normalizedEntity.startsWith('&#')) {
+        const codePoint = Number.parseInt(normalizedEntity.slice(2, -1), 10);
+
+        return Number.isNaN(codePoint)
+            ? entity
+            : String.fromCodePoint(codePoint);
+    }
+
+    switch (normalizedEntity) {
+        case '&amp;':
+            return '&';
+        case '&lt;':
+            return '<';
+        case '&gt;':
+            return '>';
+        case '&quot;':
+            return '"';
+        case '&apos;':
+            return "'";
+        case '&nbsp;':
+            return ' ';
+        default:
+            return entity;
+    }
 }
 
 async function loadEditableNote(
