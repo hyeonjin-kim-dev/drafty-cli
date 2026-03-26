@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import {
     archiveNote,
+    filterNotesByBodyQuery,
     formatNoteEditMessages,
     formatTags,
     formatTimestamp,
@@ -16,15 +17,30 @@ import { promptForNoteSelection } from './interactive-list.js';
 import { promptForNoteEdit } from './interactive-edit.js';
 import { promptForNoteRemovalConfirmation } from './interactive-remove.js';
 
-export async function listNotesCommand(rawTags: string[] = []): Promise<void> {
+interface ListCommandOptions {
+    initialSearchQuery?: string;
+    emptyMessage?: string;
+}
+
+export async function listNotesCommand(
+    rawTags: string[] = [],
+    options: ListCommandOptions = {},
+): Promise<void> {
     const supabase = createNotesClient();
     const tags = parseTags(rawTags);
+    const initialSearchQuery = options.initialSearchQuery?.trim() ?? '';
 
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
-        const data = await listNotes(supabase, { tags });
+        const data = filterNotesByBodyQuery(
+            await listNotes(supabase, { tags }),
+            initialSearchQuery,
+        );
 
         if (data.length === 0) {
-            console.log('No notes found.');
+            console.log(
+                options.emptyMessage ??
+                    buildEmptyNotesMessage(initialSearchQuery),
+            );
             return;
         }
 
@@ -32,7 +48,7 @@ export async function listNotesCommand(rawTags: string[] = []): Promise<void> {
         return;
     }
 
-    await runInteractiveListLoop(supabase, tags);
+    await runInteractiveListLoop(supabase, tags, initialSearchQuery);
 }
 
 function printPlainNoteList(notes: NoteSummary[]): void {
@@ -47,8 +63,10 @@ function printPlainNoteList(notes: NoteSummary[]): void {
 async function runInteractiveListLoop(
     supabase: SupabaseClient<Database>,
     tags: string[],
+    initialSearchQuery = '',
 ): Promise<void> {
     let activeFilterTag: string | null = null;
+    let activeSearchQuery = initialSearchQuery;
 
     while (true) {
         const notes = await listNotes(supabase, { tags });
@@ -58,7 +76,11 @@ async function runInteractiveListLoop(
             return;
         }
 
-        const selection = await promptForNoteSelection(notes, activeFilterTag);
+        const selection = await promptForNoteSelection(
+            notes,
+            activeFilterTag,
+            activeSearchQuery,
+        );
 
         if (!selection) {
             console.log('Canceled.');
@@ -66,6 +88,7 @@ async function runInteractiveListLoop(
         }
 
         activeFilterTag = selection.filterTag;
+        activeSearchQuery = selection.searchQuery;
 
         if (selection.action === 'remove') {
             const selectedNote = notes.find(
@@ -129,4 +152,10 @@ function printSingleRemovalPreview(note: NoteSummary): void {
         `  ${formatTimestamp(note.created_at)}  Tags: ${formatTags(note.cli_tags)}`,
     );
     console.log('');
+}
+
+function buildEmptyNotesMessage(searchQuery: string): string {
+    return searchQuery
+        ? `No notes matched the search query: ${searchQuery}`
+        : 'No notes found.';
 }

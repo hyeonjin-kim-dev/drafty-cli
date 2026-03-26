@@ -13,7 +13,7 @@
 - **설정 마법사** — `drafty login`으로 Supabase URL, anon key, project id를 사용자별 설정 파일에 저장합니다.
 - **시스템 에디터 연동** — `$VISUAL`, `$EDITOR`, VS Code, Notepad, vim 중 사용 가능한 에디터를 엽니다.
 - **태그 중심 캡처** — `drafty work idea`처럼 위치 인수로 태그를 바로 붙일 수 있습니다.
-- **대화형 TTY 메뉴** — 목록 조회, 프리뷰, 태그 필터링, 수정, 삭제를 방향키 기반 UI에서 처리합니다.
+- **대화형 TTY 메뉴** — 목록 조회, 프리뷰, 태그 필터링, 본문 검색, 수정, 삭제를 방향키 기반 UI에서 처리합니다.
 - **소프트 삭제** — 삭제된 노트는 보관 처리되며 `drafty show <id>`로 계속 볼 수 있습니다.
 - **크로스 플랫폼** — Windows, macOS, Linux에서 동작합니다.
 
@@ -32,6 +32,7 @@ drafty login          # SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_PROJECT_ID 저
 drafty work idea      # 에디터를 열어 태그와 함께 메모 저장
 drafty list           # TTY에서 메모를 대화형으로 탐색
 drafty list todo idea # todo 또는 idea 태그가 있는 활성 메모 조회
+drafty search meeting notes # 메모 본문에서 문구 검색
 drafty show <id>      # 보관된 메모까지 포함해 단일 메모 조회
 drafty rm <id>        # 메모 보관 처리
 drafty normalize-markdown --dry-run # 저장된 마크다운 정리 결과 미리보기
@@ -70,7 +71,8 @@ Drafty는 아래 순서로 설정을 찾습니다.
 | `drafty [tags...]`          | 에디터를 열고 선택한 태그와 함께 새 메모를 저장                                                                                                |
 | `drafty login`              | 설정 마법사를 실행하고 Supabase 정보를 저장                                                                                                    |
 | `drafty logout`             | 저장된 설정과 레거시 세션 파일을 제거                                                                                                          |
-| `drafty list [tags...]`     | 활성 메모를 조회. 태그 OR 필터 지원. TTY에서는 프리뷰, 컬러 태그, 상단 태그 필터, `d` 또는 `Delete` 삭제 단축키 제공                           |
+| `drafty list [tags...]`     | 활성 메모를 조회. 태그 OR 필터 지원. TTY에서는 프리뷰, 컬러 태그, 상단 태그 필터, `s` 또는 `/` 본문 검색, `d` 또는 `Delete` 삭제 단축키 제공   |
+| `drafty search <query...>`  | 활성 메모 본문에서 문구를 검색. TTY에서는 결과를 다시 좁히고, 수정하거나 삭제까지 이어서 처리 가능                                             |
 | `drafty show <id>`          | 보관된 메모를 포함해 단일 메모 조회                                                                                                            |
 | `drafty edit <id>`          | 메모 본문 또는 태그 수정                                                                                                                       |
 | `drafty rm [id]`            | id로 단일 메모 보관 또는 TTY에서 여러 메모 선택 보관                                                                                           |

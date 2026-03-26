@@ -14,6 +14,7 @@ import stringWidth from 'string-width';
 import { styleText, stripVTControlCharacters } from 'node:util';
 
 import {
+    filterNotesByBodyQuery,
     formatTimestamp,
     normalizeMarkdownForDisplay,
     summarizeNoteBody,
@@ -25,12 +26,14 @@ interface NoteSelectionPromptConfig {
     message: string;
     notes: NoteSummary[];
     initialFilterTag?: string | null;
+    initialSearchQuery?: string;
 }
 
 export interface NoteSelectionResult {
     action: 'edit' | 'remove';
     noteId: string;
     filterTag: string | null;
+    searchQuery: string;
 }
 
 type TagFilterValue = string | null;
@@ -137,11 +140,18 @@ const noteSelectionPrompt = createPrompt<
             ),
         ),
     );
+    const [searchQuery, setSearchQuery] = useState(
+        config.initialSearchQuery ?? '',
+    );
+    const [isSearchMode, setIsSearchMode] = useState(false);
     const [previewScrollOffset, setPreviewScrollOffset] = useState(0);
     const totalWidth = getTerminalWidth();
     const panelWidths = getPanelWidths(totalWidth);
     const activeTagFilter = tagFilterOptions[activeTagIndex]?.value ?? null;
-    const filteredNotes = filterNotesByTag(notes, activeTagFilter);
+    const filteredNotes = filterNotesByBodyQuery(
+        filterNotesByTag(notes, activeTagFilter),
+        searchQuery,
+    );
     const clampedActiveIndex = clampActiveIndex(
         activeIndex,
         filteredNotes.length,
@@ -153,7 +163,13 @@ const noteSelectionPrompt = createPrompt<
         width: totalWidth,
         theme,
     });
-    const panelHeight = getPanelHeight(tagBarLines.length);
+    const searchLine = renderSearchLine({
+        query: searchQuery,
+        isEditing: isSearchMode,
+        width: totalWidth,
+        theme,
+    });
+    const panelHeight = getPanelHeight(tagBarLines.length + 1);
     const maxVisibleNotes = getVisibleNoteCount(panelHeight);
     const previewPanel = selectedNote
         ? renderPreviewPanel({
@@ -163,12 +179,49 @@ const noteSelectionPrompt = createPrompt<
               scrollOffset: previewScrollOffset,
               theme,
           })
-        : null;
+        : renderEmptyPreviewPanel({
+              width: panelWidths.rightWidth,
+              targetHeight: panelHeight,
+              hasActiveFilters:
+                  activeTagFilter !== null || searchQuery.trim().length > 0,
+              theme,
+          });
     const previewScrollStep = getPreviewScrollStep(
         previewPanel?.bodyViewportHeight ?? 0,
     );
 
     useKeypress((key, rl) => {
+        if (isSearchMode) {
+            if (isEnterKey(key) || isEscapeKey(key)) {
+                rl.clearLine(0);
+                setIsSearchMode(false);
+                return;
+            }
+
+            if (isBackspaceKey(key)) {
+                if (!searchQuery) {
+                    return;
+                }
+
+                rl.clearLine(0);
+                setPreviewScrollOffset(0);
+                setActiveIndex(0);
+                setSearchQuery(searchQuery.slice(0, -1));
+                return;
+            }
+
+            const nextSearchCharacter = getSearchInputCharacter(key);
+
+            if (nextSearchCharacter !== null) {
+                rl.clearLine(0);
+                setPreviewScrollOffset(0);
+                setActiveIndex(0);
+                setSearchQuery(`${searchQuery}${nextSearchCharacter}`);
+            }
+
+            return;
+        }
+
         if (isEnterKey(key)) {
             const selectedNote = filteredNotes[clampedActiveIndex];
 
@@ -181,11 +234,14 @@ const noteSelectionPrompt = createPrompt<
                 action: 'edit',
                 noteId: selectedNote.id,
                 filterTag: activeTagFilter,
+                searchQuery,
             });
             return;
         }
 
-        if (!filteredNotes.length) {
+        if (isSearchShortcutKey(key)) {
+            rl.clearLine(0);
+            setIsSearchMode(true);
             return;
         }
 
@@ -210,6 +266,10 @@ const noteSelectionPrompt = createPrompt<
                     ? 0
                     : activeTagIndex + 1,
             );
+            return;
+        }
+
+        if (!filteredNotes.length) {
             return;
         }
 
@@ -294,15 +354,10 @@ const noteSelectionPrompt = createPrompt<
                 action: 'remove',
                 noteId: selectedNote.id,
                 filterTag: activeTagFilter,
+                searchQuery,
             });
         }
     });
-
-    if (!selectedNote) {
-        return [prefix, config.message, theme.style.answer('(none)')]
-            .filter(Boolean)
-            .join(' ');
-    }
 
     const panelLines = renderPanels({
         notes: filteredNotes,
@@ -317,11 +372,13 @@ const noteSelectionPrompt = createPrompt<
     const helpLine = buildHelpLine(
         theme,
         (previewPanel?.maxScrollOffset ?? 0) > 0,
+        isSearchMode,
     );
     const message = theme.style.message(config.message, status);
     const lines = [
         [prefix, message].filter(Boolean).join(' '),
         ...tagBarLines,
+        searchLine,
         '',
         ...panelLines,
         helpLine,
@@ -336,12 +393,14 @@ const noteSelectionPrompt = createPrompt<
 export async function promptForNoteSelection(
     notes: NoteSummary[],
     initialFilterTag: TagFilterValue = null,
+    initialSearchQuery = '',
 ): Promise<NoteSelectionResult | null> {
     try {
         return await noteSelectionPrompt({
-            message: 'Select a note to edit or remove',
+            message: 'Select a note to edit, remove, or search',
             notes,
             initialFilterTag,
+            initialSearchQuery,
         });
     } catch (error) {
         if (isPromptCancellation(error)) {
@@ -454,11 +513,20 @@ function renderListPanel({
         );
     }
 
+    if (visibleNotes.length === 0) {
+        lines.push(theme.style.muted('No notes match the current filters.'));
+    }
+
     while (lines.length < 2 + noteAreaHeight) {
         lines.push('');
     }
 
     lines.push('');
+    if (visibleNotes.length === 0) {
+        lines.push(theme.style.help('Showing 0 of 0'));
+        return lines;
+    }
+
     const firstVisibleIndex = visibleNotes[0]?.index ?? 0;
     const lastVisibleIndex = visibleNotes[visibleNotes.length - 1]?.index ?? 0;
     lines.push(
@@ -536,6 +604,69 @@ function renderPreviewPanel({
         bodyViewportHeight,
         totalBodyLines: allBodyLines.length,
     };
+}
+
+function renderEmptyPreviewPanel({
+    width,
+    targetHeight,
+    hasActiveFilters,
+    theme,
+}: {
+    width: number;
+    targetHeight: number;
+    hasActiveFilters: boolean;
+    theme: ReturnType<typeof makeTheme<typeof listPromptTheme>>;
+}): PreviewPanelState {
+    const previewLines = [
+        theme.style.title('Preview'),
+        theme.style.rule('─'.repeat(width)),
+        '',
+        theme.style.muted(
+            hasActiveFilters
+                ? 'No notes match the current filters.'
+                : 'No note selected.',
+        ),
+    ];
+
+    while (previewLines.length < targetHeight) {
+        previewLines.push('');
+    }
+
+    return {
+        lines: previewLines,
+        maxScrollOffset: 0,
+        scrollOffset: 0,
+        bodyViewportHeight: Math.max(0, targetHeight - 4),
+        totalBodyLines: 0,
+    };
+}
+
+function renderSearchLine({
+    query,
+    isEditing,
+    width,
+    theme,
+}: {
+    query: string;
+    isEditing: boolean;
+    width: number;
+    theme: ReturnType<typeof makeTheme<typeof listPromptTheme>>;
+}): string {
+    const label = `${theme.style.label('Search:')} `;
+    const value = query
+        ? theme.style.accent(query)
+        : theme.style.muted('(none)');
+    const suffix = isEditing
+        ? theme.style.selected('|')
+        : theme.style.help(
+              query ? '  (press s or / to edit)' : '  (press s or / to search)',
+          );
+
+    return fitPanelLine(
+        `${label}${value}${suffix}`,
+        width,
+        theme.style.ellipsis,
+    );
 }
 
 function renderMarkdownPreview({
@@ -895,16 +1026,23 @@ function buildPreviewTitle({
 function buildHelpLine(
     theme: ReturnType<typeof makeTheme<typeof listPromptTheme>>,
     canScrollPreview: boolean,
+    isSearchMode: boolean,
 ): string {
+    if (isSearchMode) {
+        return theme.style.help(
+            'Search mode • type to filter body • Enter finish • Backspace delete • Esc stop',
+        );
+    }
+
     const baseHelp =
-        '←→/Tab tag • ↑↓ note • d/Delete remove • Enter edit • Ctrl+C cancel';
+        's or / search • ←→/Tab tag • ↑↓ note • d/Delete remove • Enter edit • Ctrl+C cancel';
 
     if (!canScrollPreview) {
         return theme.style.help(baseHelp);
     }
 
     return theme.style.help(
-        '←→/Tab tag • ↑↓ note • PgUp/PgDn preview • d/Delete remove • Enter edit • Ctrl+C cancel',
+        's or / search • ←→/Tab tag • ↑↓ note • PgUp/PgDn preview • d/Delete remove • Enter edit • Ctrl+C cancel',
     );
 }
 
@@ -926,6 +1064,26 @@ function isHomeKey(key: { name?: string }): boolean {
 
 function isEndKey(key: { name?: string }): boolean {
     return key.name === 'end';
+}
+
+function isEscapeKey(key: { name?: string }): boolean {
+    return key.name === 'escape';
+}
+
+function isBackspaceKey(key: { name?: string }): boolean {
+    return key.name === 'backspace';
+}
+
+function isSearchShortcutKey(key: {
+    name?: string;
+    sequence?: string;
+}): boolean {
+    return (
+        key.name === 's' ||
+        key.sequence === 's' ||
+        key.name === 'slash' ||
+        key.sequence === '/'
+    );
 }
 
 function isPreviousTagKey(key: {
@@ -955,6 +1113,26 @@ function isNextTagKey(key: {
 
 function isRemoveKey(key: { name?: string; sequence?: string }): boolean {
     return key.name === 'delete' || key.name === 'd' || key.sequence === 'd';
+}
+
+function getSearchInputCharacter(key: {
+    sequence?: string;
+    ctrl?: boolean;
+    meta?: boolean;
+}): string | null {
+    if (!key.sequence || key.ctrl || key.meta) {
+        return null;
+    }
+
+    if (
+        key.sequence === '\r' ||
+        key.sequence === '\n' ||
+        key.sequence === '\t'
+    ) {
+        return null;
+    }
+
+    return key.sequence.length === 1 ? key.sequence : null;
 }
 
 function clampActiveIndex(activeIndex: number, noteCount: number): number {

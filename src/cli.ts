@@ -9,6 +9,7 @@ import { loginCommand } from './commands/login.js';
 import { normalizeMarkdownCommand } from './commands/normalize-markdown.js';
 import { logoutCommand } from './commands/logout.js';
 import { removeNoteCommand } from './commands/remove.js';
+import { searchNotesCommand } from './commands/search.js';
 import { showNoteCommand } from './commands/show.js';
 import { updateCommand } from './commands/update.js';
 import { loadDraftyEnv } from './lib/config.js';
@@ -59,6 +60,16 @@ async function main(): Promise<void> {
         .argument('<id>', 'note id')
         .action(async (id: string) => {
             await editNoteCommand(id);
+        });
+
+    program
+        .command('search')
+        .description(
+            'Search active note bodies, or browse matches in a TTY menu',
+        )
+        .argument('<query...>', 'search active note bodies for a phrase')
+        .action(async (queryParts: string[] = []) => {
+            await searchNotesCommand(queryParts);
         });
 
     program
@@ -116,6 +127,7 @@ async function main(): Promise<void> {
             '  $ drafty edit <id>    # choose body or tags',
             '  $ drafty list',
             '  $ drafty list todo idea',
+            '  $ drafty search meeting notes',
             '  $ drafty rm <id>',
             '  $ drafty rm           # interactive multi-select in a TTY',
             '  $ drafty update       # update to the latest version',

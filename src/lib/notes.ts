@@ -388,6 +388,21 @@ export function formatTags(tags: string[]): string {
     return tags.length > 0 ? tags.join(', ') : '(none)';
 }
 
+export function filterNotesByBodyQuery<T extends Pick<NoteSummary, 'body'>>(
+    notes: T[],
+    query: string,
+): T[] {
+    const normalizedQuery = normalizeNoteBodyQuery(query);
+
+    if (!normalizedQuery) {
+        return notes;
+    }
+
+    return notes.filter((note) =>
+        normalizeSearchableNoteBody(note.body).includes(normalizedQuery),
+    );
+}
+
 export function normalizeNoteBody(value: string): string {
     return value;
 }
@@ -441,6 +456,17 @@ export function summarizeNoteBody(body: string, maxLength = 72): string {
     }
 
     return `${normalizedBody.slice(0, maxLength - 3).trimEnd()}...`;
+}
+
+function normalizeNoteBodyQuery(value: string): string {
+    return value.replace(/\s+/gu, ' ').trim().toLocaleLowerCase();
+}
+
+function normalizeSearchableNoteBody(value: string): string {
+    return normalizeMarkdownForDisplay(value)
+        .replace(/\s+/gu, ' ')
+        .trim()
+        .toLocaleLowerCase();
 }
 
 function areTagsEqual(left: string[], right: string[]): boolean {

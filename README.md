@@ -13,7 +13,7 @@
 - **Setup wizard** — `drafty login` saves your Supabase URL, anon key, and project id to a per-user config file
 - **System editor flow** — opens `$VISUAL`, `$EDITOR`, VS Code, Notepad, or vim
 - **Tag-first capture** — attach tags as positional arguments such as `drafty work idea`
-- **Interactive TTY menus** — arrow-key picker for listing, previewing, tag filtering, editing, and removing notes
+- **Interactive TTY menus** — arrow-key picker for listing, previewing, tag filtering, body searching, editing, and removing notes
 - **Soft delete** — archived notes stay visible through `drafty show <id>`
 - **Cross-platform** — Windows, macOS, Linux
 
@@ -32,6 +32,7 @@ drafty login          # save SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_PROJECT_I
 drafty work idea      # open editor -> save note with tags
 drafty list           # browse notes interactively in a TTY
 drafty list todo idea # show active notes tagged todo OR idea
+drafty search meeting notes # search note bodies for a phrase
 drafty show <id>      # inspect a note, including archived notes
 drafty rm <id>        # archive a note
 drafty normalize-markdown --dry-run # preview stored markdown cleanup
@@ -65,17 +66,18 @@ Per-user config paths:
 
 ## Commands
 
-| Command                     | Description                                                                                                                                                                                                                |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `drafty [tags...]`          | Open an editor and save a new note with optional tags                                                                                                                                                                      |
-| `drafty login`              | Run the setup wizard and save local Supabase config                                                                                                                                                                        |
-| `drafty logout`             | Remove the saved local config and any legacy session file                                                                                                                                                                  |
-| `drafty list [tags...]`     | List active notes, optionally filtered by tags with OR semantics; interactive TTY view includes a preview pane, colored tags, top tag filtering with `Tab` or arrow keys, and direct remove shortcuts with `d` or `Delete` |
-| `drafty show <id>`          | Show a single note, including archived notes                                                                                                                                                                               |
-| `drafty edit <id>`          | Edit a note body or its tags                                                                                                                                                                                               |
-| `drafty rm [id]`            | Archive one note by id, or multi-select notes in a TTY                                                                                                                                                                     |
-| `drafty normalize-markdown` | Repair stored markdown by removing escaped markdown symbols such as `\_`, `\[`, `\*`, `1\.` and decoding stored HTML entities such as `&#x20;`; use `--dry-run` to preview and `--yes` to skip confirmation                |
-| `drafty update`             | Check for a newer npm version and update; use `--check` to preview without installing                                                                                                                                      |
+| Command                     | Description                                                                                                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `drafty [tags...]`          | Open an editor and save a new note with optional tags                                                                                                                                                                                                   |
+| `drafty login`              | Run the setup wizard and save local Supabase config                                                                                                                                                                                                     |
+| `drafty logout`             | Remove the saved local config and any legacy session file                                                                                                                                                                                               |
+| `drafty list [tags...]`     | List active notes, optionally filtered by tags with OR semantics; interactive TTY view includes a preview pane, colored tags, top tag filtering with `Tab` or arrow keys, body search with `s` or `/`, and direct remove shortcuts with `d` or `Delete` |
+| `drafty search <query...>`  | Search active note bodies for a phrase; in a TTY, browse, refine, edit, and remove matching notes interactively                                                                                                                                         |
+| `drafty show <id>`          | Show a single note, including archived notes                                                                                                                                                                                                            |
+| `drafty edit <id>`          | Edit a note body or its tags                                                                                                                                                                                                                            |
+| `drafty rm [id]`            | Archive one note by id, or multi-select notes in a TTY                                                                                                                                                                                                  |
+| `drafty normalize-markdown` | Repair stored markdown by removing escaped markdown symbols such as `\_`, `\[`, `\*`, `1\.` and decoding stored HTML entities such as `&#x20;`; use `--dry-run` to preview and `--yes` to skip confirmation                                             |
+| `drafty update`             | Check for a newer npm version and update; use `--check` to preview without installing                                                                                                                                                                   |
 
 ## Editor
 
