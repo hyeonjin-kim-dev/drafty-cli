@@ -141,6 +141,7 @@ npm run db:types
 - 원본은 항상 현재 환경의 로컬 markdown 파일입니다.
 - 다른 PC에서는 `drafty list`, `drafty show`로 동기화된 문서를 열람할 수 있습니다.
 - Drafty 안에서 동기화 문서를 수정할 수는 없습니다. 로컬 파일을 수정한 뒤 `drafty sync`를 다시 실행해야 합니다.
+- 하위 디렉터리에서 `drafty sync`를 실행해도 같은 markdown 파일이면 기존에 동기화된 같은 메모를 업데이트합니다.
 - 현재 동기화 루트 아래에서 markdown 파일이 사라지면 다음 sync에서 해당 Drafty 메모는 archived 처리됩니다.
 - list와 show에는 동기화된 문서의 환경 라벨과 원본 경로가 함께 표시됩니다.
 
