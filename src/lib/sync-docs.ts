@@ -54,7 +54,6 @@ export async function syncDocsNotes(
     const existingNotes = await listExistingDocsSyncNotes(
         supabase,
         envLabel,
-        syncRoot,
     );
     const existingByKey = new Map(
         existingNotes.map((note) => [
@@ -127,7 +126,13 @@ export async function syncDocsNotes(
         );
 
         return (
-            note.status !== ARCHIVED_NOTE_STATUS && !desiredKeys.has(sourceKey)
+            note.status !== ARCHIVED_NOTE_STATUS &&
+            isSourceWithinSyncRoot(
+                note.source_worktree_path ?? '',
+                note.source_relative_path ?? '',
+                syncRoot,
+            ) &&
+            !desiredKeys.has(sourceKey)
         );
     });
     const archivedCount = staleNotes.length;
@@ -230,15 +235,13 @@ async function collectMarkdownFiles(
 async function listExistingDocsSyncNotes(
     supabase: SupabaseClient<Database>,
     envLabel: string,
-    syncRoot: string,
 ): Promise<ExistingDocsSyncNote[]> {
     const { data, error } = await getNotesTable(supabase)
         .select(
             'id, cli_tags, status, source_hash, source_relative_path, source_worktree_path',
         )
         .eq('source_kind', DOCS_SYNC_SOURCE_KIND)
-        .eq('source_env_label', envLabel)
-        .eq('source_repo_root', syncRoot);
+        .eq('source_env_label', envLabel);
 
     if (error) {
         throw wrapSupabaseError('Failed to load synced docs notes', error);
@@ -327,7 +330,32 @@ function buildSourceKey(
     sourceWorktreePath: string,
     sourceRelativePath: string,
 ): string {
-    return `${sourceWorktreePath}\u0000${sourceRelativePath}`;
+    return resolveAbsoluteSourcePath(sourceWorktreePath, sourceRelativePath);
+}
+
+function isSourceWithinSyncRoot(
+    sourceWorktreePath: string,
+    sourceRelativePath: string,
+    syncRoot: string,
+): boolean {
+    const absoluteSourcePath = resolveAbsoluteSourcePath(
+        sourceWorktreePath,
+        sourceRelativePath,
+    );
+    const relativeSourcePath = path.relative(syncRoot, absoluteSourcePath);
+
+    return (
+        relativeSourcePath === '' ||
+        (!relativeSourcePath.startsWith('..') &&
+            !path.isAbsolute(relativeSourcePath))
+    );
+}
+
+function resolveAbsoluteSourcePath(
+    sourceWorktreePath: string,
+    sourceRelativePath: string,
+): string {
+    return normalizeStoredPath(path.resolve(sourceWorktreePath, sourceRelativePath));
 }
 
 function normalizeStoredPath(value: string): string {

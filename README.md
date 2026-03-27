@@ -141,6 +141,7 @@ The current schema uses a single `notes` table with anon-key access and an activ
 - Source of truth stays in the local markdown file.
 - Synced docs can be opened from other machines through `drafty list` and `drafty show`.
 - Editing a synced markdown note inside Drafty is blocked; change the source markdown file locally, then run `drafty sync` again.
+- Running `drafty sync` from a nested subdirectory still updates the same synced note for the same markdown file.
 - If a synced markdown file disappears from the current directory tree, the next sync archives the corresponding Drafty note.
 - List and show surfaces include the environment label and source path for synced docs.
 
