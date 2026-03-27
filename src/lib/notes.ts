@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Database } from '../types/database.types.js';
-import { openEditor } from './editor.js';
+import { openEditor, openEditorSession } from './editor.js';
 import { DraftyError, wrapSupabaseError } from './errors.js';
 import { parseTags } from './parse-tags.js';
 
@@ -119,6 +119,12 @@ export type NoteEditResult =
     | UnchangedNoteEditResult
     | EmptyNoteEditResult;
 
+export interface NoteEditSession {
+    noteId: string;
+    target: NoteEditTarget;
+    completion: Promise<NoteEditResult>;
+}
+
 export async function listNotes(
     supabase: SupabaseClient<Database>,
     options: ListNotesOptions = {},
@@ -224,44 +230,7 @@ export async function editNoteBody(
     id: string,
 ): Promise<NoteEditResult> {
     const note = await loadEditableNote(supabase, id);
-    const draftedBody = await openEditor(note.body);
-    const nextBody = normalizeNoteBody(draftedBody);
-
-    if (!nextBody.trim()) {
-        return {
-            outcome: 'empty',
-            target: 'body',
-            noteId: note.id,
-            tags: note.cli_tags,
-        };
-    }
-
-    if (nextBody === note.body) {
-        return {
-            outcome: 'unchanged',
-            target: 'body',
-            noteId: note.id,
-            tags: note.cli_tags,
-        };
-    }
-
-    const { data, error } = await supabase
-        .from('notes')
-        .update({ body: nextBody })
-        .eq('id', note.id)
-        .select('id, cli_tags')
-        .single();
-
-    if (error) {
-        throw wrapSupabaseError('Failed to update the note', error);
-    }
-
-    return {
-        outcome: 'updated',
-        target: 'body',
-        noteId: data.id,
-        tags: data.cli_tags,
-    };
+    return finalizeBodyEdit(supabase, note, await openEditor(note.body));
 }
 
 export async function editNoteTags(
@@ -269,34 +238,42 @@ export async function editNoteTags(
     id: string,
 ): Promise<NoteEditResult> {
     const note = await loadEditableNote(supabase, id);
-    const draftedTags = await openEditor(serializeEditableTags(note.cli_tags));
-    const nextTags = normalizeEditableTags(draftedTags);
+    return finalizeTagEdit(
+        supabase,
+        note,
+        await openEditor(serializeEditableTags(note.cli_tags)),
+    );
+}
 
-    if (areTagsEqual(nextTags, note.cli_tags)) {
-        return {
-            outcome: 'unchanged',
-            target: 'tags',
-            noteId: note.id,
-            tags: note.cli_tags,
-        };
-    }
-
-    const { data, error } = await supabase
-        .from('notes')
-        .update({ cli_tags: nextTags })
-        .eq('id', note.id)
-        .select('id, cli_tags')
-        .single();
-
-    if (error) {
-        throw wrapSupabaseError('Failed to update the note tags', error);
-    }
+export async function startNoteBodyEditSession(
+    supabase: SupabaseClient<Database>,
+    id: string,
+): Promise<NoteEditSession> {
+    const note = await loadEditableNote(supabase, id);
+    const session = await openEditorSession(note.body);
 
     return {
-        outcome: 'updated',
+        noteId: note.id,
+        target: 'body',
+        completion: session.completion.then((draftedBody) =>
+            finalizeBodyEdit(supabase, note, draftedBody),
+        ),
+    };
+}
+
+export async function startNoteTagsEditSession(
+    supabase: SupabaseClient<Database>,
+    id: string,
+): Promise<NoteEditSession> {
+    const note = await loadEditableNote(supabase, id);
+    const session = await openEditorSession(serializeEditableTags(note.cli_tags));
+
+    return {
+        noteId: note.id,
         target: 'tags',
-        noteId: data.id,
-        tags: data.cli_tags,
+        completion: session.completion.then((draftedTags) =>
+            finalizeTagEdit(supabase, note, draftedTags),
+        ),
     };
 }
 
@@ -478,6 +455,85 @@ function areTagsEqual(left: string[], right: string[]): boolean {
 
 function serializeEditableTags(tags: string[]): string {
     return tags.join(' ');
+}
+
+async function finalizeBodyEdit(
+    supabase: SupabaseClient<Database>,
+    note: EditableNote,
+    draftedBody: string,
+): Promise<NoteEditResult> {
+    const nextBody = normalizeNoteBody(draftedBody);
+
+    if (!nextBody.trim()) {
+        return {
+            outcome: 'empty',
+            target: 'body',
+            noteId: note.id,
+            tags: note.cli_tags,
+        };
+    }
+
+    if (nextBody === note.body) {
+        return {
+            outcome: 'unchanged',
+            target: 'body',
+            noteId: note.id,
+            tags: note.cli_tags,
+        };
+    }
+
+    const { data, error } = await supabase
+        .from('notes')
+        .update({ body: nextBody })
+        .eq('id', note.id)
+        .select('id, cli_tags')
+        .single();
+
+    if (error) {
+        throw wrapSupabaseError('Failed to update the note', error);
+    }
+
+    return {
+        outcome: 'updated',
+        target: 'body',
+        noteId: data.id,
+        tags: data.cli_tags,
+    };
+}
+
+async function finalizeTagEdit(
+    supabase: SupabaseClient<Database>,
+    note: EditableNote,
+    draftedTags: string,
+): Promise<NoteEditResult> {
+    const nextTags = normalizeEditableTags(draftedTags);
+
+    if (areTagsEqual(nextTags, note.cli_tags)) {
+        return {
+            outcome: 'unchanged',
+            target: 'tags',
+            noteId: note.id,
+            tags: note.cli_tags,
+        };
+    }
+
+    const { data, error } = await supabase
+        .from('notes')
+        .update({ cli_tags: nextTags })
+        .eq('id', note.id)
+        .select('id, cli_tags')
+        .single();
+
+    if (error) {
+        throw wrapSupabaseError('Failed to update the note tags', error);
+    }
+
+    return {
+        outcome: 'updated',
+        target: 'tags',
+        noteId: data.id,
+        tags: data.cli_tags,
+    };
 }
 
 async function collectMarkdownNormalizationTargets(
