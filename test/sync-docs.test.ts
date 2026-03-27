@@ -59,7 +59,10 @@ class UpdateQuery {
     }
 
     in(column: keyof FakeNote, values: string[]): this {
-        this.filters.push((note) => values.includes(note[column]));
+        this.filters.push((note) => {
+            const candidate = note[column];
+            return typeof candidate === 'string' && values.includes(candidate);
+        });
         return this;
     }
 

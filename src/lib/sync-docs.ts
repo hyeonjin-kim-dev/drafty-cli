@@ -345,9 +345,8 @@ function isSourceWithinSyncRoot(
     const relativeSourcePath = path.relative(syncRoot, absoluteSourcePath);
 
     return (
-        relativeSourcePath === '' ||
-        (!relativeSourcePath.startsWith('..') &&
-            !path.isAbsolute(relativeSourcePath))
+        !relativeSourcePath.startsWith('..') &&
+        !path.isAbsolute(relativeSourcePath)
     );
 }
 
