@@ -154,7 +154,11 @@ test('sync updates the same note when rerun from a nested child directory', asyn
     assert.equal(secondSync.updatedCount, 1);
     assert.equal(secondSync.archivedCount, 0);
     assert.equal(supabase.notes.length, 1);
-    assert.equal(supabase.notes[0]?.body, 'second version\n');
+
+    const [storedNote] = supabase.notes;
+
+    assert.ok(storedNote);
+    assert.equal(storedNote.body, 'second version\n');
 });
 
 test('sync from a child directory only archives removed notes inside that subtree', async () => {
