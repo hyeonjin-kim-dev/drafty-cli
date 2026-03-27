@@ -216,7 +216,9 @@ async function collectMarkdownFiles(
 
         docsFiles.push({
             body,
-            source_hash: createHash('sha256').update(body, 'utf8').digest('hex'),
+            source_hash: createHash('sha256')
+                .update(body, 'utf8')
+                .digest('hex'),
             source_relative_path: sourceRelativePath,
             source_worktree_path: normalizeStoredPath(syncRoot),
         });
@@ -310,7 +312,10 @@ async function archiveDocsSyncNotes(
         .in('id', ids);
 
     if (error) {
-        throw wrapSupabaseError('Failed to archive removed synced docs notes', error);
+        throw wrapSupabaseError(
+            'Failed to archive removed synced docs notes',
+            error,
+        );
     }
 }
 
