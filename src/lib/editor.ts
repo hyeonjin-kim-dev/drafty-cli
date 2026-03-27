@@ -248,7 +248,9 @@ function isVsCodeCommandName(commandName: string): boolean {
     );
 }
 
-function supportsBackgroundEditorSessions(editor: ResolvedEditorCommand): boolean {
+function supportsBackgroundEditorSessions(
+    editor: ResolvedEditorCommand,
+): boolean {
     if (process.platform !== 'win32') {
         return false;
     }

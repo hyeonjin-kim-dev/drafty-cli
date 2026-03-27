@@ -20,7 +20,10 @@ import { parseTags } from '../lib/parse-tags.js';
 import { createNotesClient } from '../lib/supabase.js';
 import type { Database } from '../types/database.types.js';
 import { promptForNoteSelection } from './interactive-list.js';
-import { promptForNoteEdit, promptForNoteEditTarget } from './interactive-edit.js';
+import {
+    promptForNoteEdit,
+    promptForNoteEditTarget,
+} from './interactive-edit.js';
 import { promptForNoteRemovalConfirmation } from './interactive-remove.js';
 
 interface ListCommandOptions {
@@ -290,9 +293,6 @@ function flushQueuedEditMessages(queuedEditMessages: string[][]): void {
     }
 }
 
-function getTrackedSessionKey(
-    noteId: string,
-    target: NoteEditTarget,
-): string {
+function getTrackedSessionKey(noteId: string, target: NoteEditTarget): string {
     return `${noteId}:${target}`;
 }

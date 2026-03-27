@@ -266,7 +266,9 @@ export async function startNoteTagsEditSession(
     id: string,
 ): Promise<NoteEditSession> {
     const note = await loadEditableNote(supabase, id);
-    const session = await openEditorSession(serializeEditableTags(note.cli_tags));
+    const session = await openEditorSession(
+        serializeEditableTags(note.cli_tags),
+    );
 
     return {
         noteId: note.id,
