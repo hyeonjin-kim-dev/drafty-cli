@@ -60,7 +60,15 @@ export function wrapSupabaseError(
             'row-level security policy for table "notes"',
         ) ||
         normalizedMessage.includes('null value in column "user_id"') ||
-        normalizedMessage.includes('column "user_id"')
+        normalizedMessage.includes('column "user_id"') ||
+        normalizedMessage.includes('column "source_kind"') ||
+        normalizedMessage.includes('column "is_readonly"') ||
+        normalizedMessage.includes('column "source_env_label"') ||
+        normalizedMessage.includes('column "source_repo_root"') ||
+        normalizedMessage.includes('column "source_worktree_path"') ||
+        normalizedMessage.includes('column "source_relative_path"') ||
+        normalizedMessage.includes('column "source_hash"') ||
+        normalizedMessage.includes('column "synced_at"')
     ) {
         return new DraftyError(
             'Your Supabase project is missing the latest Drafty schema. Apply the repository migrations, then run `drafty login` again.',

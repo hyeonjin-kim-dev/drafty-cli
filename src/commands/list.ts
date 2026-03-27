@@ -4,10 +4,13 @@ import { canOpenEditorInBackground } from '../lib/editor.js';
 import { formatError } from '../lib/errors.js';
 import {
     archiveNote,
+    buildReadonlyNoteEditMessage,
     filterNotesByBodyQuery,
     formatNoteEditMessages,
+    formatNoteSourceSummary,
     formatTags,
     formatTimestamp,
+    isReadonlyNote,
     listNotes,
     startNoteBodyEditSession,
     startNoteTagsEditSession,
@@ -70,7 +73,14 @@ function printPlainNoteList(notes: NoteSummary[]): void {
     for (const note of notes) {
         console.log(formatTags(note.cli_tags));
         console.log(summarizeNoteBody(note.body));
-        console.log(`Updated: ${formatTimestamp(note.updated_at)}`);
+        const metadata = [`Updated: ${formatTimestamp(note.updated_at)}`];
+        const sourceSummary = formatNoteSourceSummary(note);
+
+        if (sourceSummary) {
+            metadata.push(sourceSummary);
+        }
+
+        console.log(metadata.join('  '));
         console.log('');
     }
 }
@@ -118,12 +128,9 @@ async function runInteractiveListLoop(
 
         activeFilterTag = selection.filterTag;
         activeSearchQuery = selection.searchQuery;
+        const selectedNote = notes.find((note) => note.id === selection.noteId);
 
         if (selection.action === 'remove') {
-            const selectedNote = notes.find(
-                (note) => note.id === selection.noteId,
-            );
-
             if (!selectedNote) {
                 console.log('Selected note is no longer available.');
                 continue;
@@ -138,15 +145,32 @@ async function runInteractiveListLoop(
             continue;
         }
 
+        if (!selectedNote) {
+            console.log('Selected note is no longer available.');
+            continue;
+        }
+
+        if (isReadonlyNote(selectedNote)) {
+            console.log(buildReadonlyNoteEditMessage(selectedNote));
+            continue;
+        }
+
         if (!canOpenEditorInBackground()) {
-            const result = await promptForNoteEdit(supabase, selection.noteId);
+            try {
+                const result = await promptForNoteEdit(
+                    supabase,
+                    selection.noteId,
+                );
 
-            if (!result) {
-                continue;
-            }
+                if (!result) {
+                    continue;
+                }
 
-            for (const line of formatNoteEditMessages(result)) {
-                console.log(line);
+                for (const line of formatNoteEditMessages(result)) {
+                    console.log(line);
+                }
+            } catch (error) {
+                console.log(formatError(error));
             }
 
             continue;
@@ -167,21 +191,25 @@ async function runInteractiveListLoop(
             continue;
         }
 
-        const session = await startTrackedNoteEditSession(
-            supabase,
-            selection.noteId,
-            target,
-        );
-        const trackedSession = trackNoteEditSession(
-            session,
-            pendingEditSessions,
-            queuedEditMessages,
-        );
+        try {
+            const session = await startTrackedNoteEditSession(
+                supabase,
+                selection.noteId,
+                target,
+            );
+            const trackedSession = trackNoteEditSession(
+                session,
+                pendingEditSessions,
+                queuedEditMessages,
+            );
 
-        pendingEditSessions.set(sessionKey, trackedSession);
-        console.log(
-            `Opened ${target} editor for note: ${selection.noteId}. Keep browsing while it stays open.`,
-        );
+            pendingEditSessions.set(sessionKey, trackedSession);
+            console.log(
+                `Opened ${target} editor for note: ${selection.noteId}. Keep browsing while it stays open.`,
+            );
+        } catch (error) {
+            console.log(formatError(error));
+        }
     }
 }
 

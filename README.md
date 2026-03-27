@@ -14,6 +14,7 @@
 - **System editor flow** — opens `$VISUAL`, `$EDITOR`, VS Code, Notepad, or vim
 - **Tag-first capture** — attach tags as positional arguments such as `drafty work idea`
 - **Interactive TTY menus** — arrow-key picker for listing, previewing, tag filtering, body searching, editing, and removing notes
+- **Markdown sync** — mirror every markdown file under the current directory as read-only notes
 - **Soft delete** — archived notes stay visible through `drafty show <id>`
 - **Cross-platform** — Windows, macOS, Linux
 
@@ -33,6 +34,7 @@ drafty work idea      # open editor -> save note with tags
 drafty list           # browse notes interactively in a TTY
 drafty list todo idea # show active notes tagged todo OR idea
 drafty search meeting notes # search note bodies for a phrase
+drafty sync           # sync all markdown files under the current directory
 drafty show <id>      # inspect a note, including archived notes
 drafty rm <id>        # archive a note
 drafty normalize-markdown --dry-run # preview stored markdown cleanup
@@ -73,6 +75,7 @@ Per-user config paths:
 | `drafty logout`             | Remove the saved local config and any legacy session file                                                                                                                                                                                               |
 | `drafty list [tags...]`     | List active notes, optionally filtered by tags with OR semantics; interactive TTY view includes a preview pane, colored tags, top tag filtering with `Tab` or arrow keys, body search with `s` or `/`, and direct remove shortcuts with `d` or `Delete` |
 | `drafty search <query...>`  | Search active note bodies for a phrase; in a TTY, browse, refine, edit, and remove matching notes interactively                                                                                                                                         |
+| `drafty sync`               | Sync every markdown file under the current directory into Drafty as read-only notes; use `--env <label>` to override the environment label and `--dry-run` to preview changes                                                                   |
 | `drafty show <id>`          | Show a single note, including archived notes                                                                                                                                                                                                            |
 | `drafty edit <id>`          | Edit a note body or its tags                                                                                                                                                                                                                            |
 | `drafty rm [id]`            | Archive one note by id, or multi-select notes in a TTY                                                                                                                                                                                                  |
@@ -130,6 +133,16 @@ npm run db:types
 ```
 
 The current schema uses a single `notes` table with anon-key access and an active or archived lifecycle.
+
+## Markdown Sync
+
+`drafty sync` recursively scans the current directory and mirrors every markdown file it finds into Drafty as read-only notes.
+
+- Source of truth stays in the local markdown file.
+- Synced docs can be opened from other machines through `drafty list` and `drafty show`.
+- Editing a synced markdown note inside Drafty is blocked; change the source markdown file locally, then run `drafty sync` again.
+- If a synced markdown file disappears from the current directory tree, the next sync archives the corresponding Drafty note.
+- List and show surfaces include the environment label and source path for synced docs.
 
 ## Troubleshooting
 

@@ -15,6 +15,7 @@ import { styleText, stripVTControlCharacters } from 'node:util';
 
 import {
     filterNotesByBodyQuery,
+    formatNoteSourceSummary,
     formatTimestamp,
     normalizeMarkdownForDisplay,
     summarizeNoteBody,
@@ -563,7 +564,11 @@ function renderPreviewPanel({
         width,
         theme.style.label,
     );
-    const headerLineCount = 4 + tagLines.length;
+    const sourceSummary = formatNoteSourceSummary(note);
+    const sourceLine = sourceSummary
+        ? theme.style.muted(truncateText(sourceSummary, width))
+        : null;
+    const headerLineCount = 4 + tagLines.length + (sourceLine ? 1 : 0);
     const bodyViewportHeight = Math.max(6, targetHeight - headerLineCount);
     const allBodyLines = renderMarkdownPreview({
         body: note.body,
@@ -589,6 +594,7 @@ function renderPreviewPanel({
             `${formatTimestamp(note.updated_at)} · ${shortNoteId(note.id)}`,
             width,
         ),
+        ...(sourceLine ? [sourceLine] : []),
         ...tagLines,
         '',
     ];
@@ -988,7 +994,14 @@ function buildListItemTagLine(note: NoteSummary, width: number): string {
 }
 
 function buildNoteUpdatedLine(note: NoteSummary, width: number): string {
-    return truncateText(`Updated ${formatTimestamp(note.updated_at)}`, width);
+    const sourceSummary = formatNoteSourceSummary(note);
+    const segments = [`Updated ${formatTimestamp(note.updated_at)}`];
+
+    if (sourceSummary) {
+        segments.push(sourceSummary);
+    }
+
+    return truncateText(segments.join(' · '), width);
 }
 
 function renderPanelDivider(

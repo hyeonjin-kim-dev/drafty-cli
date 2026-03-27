@@ -5,7 +5,24 @@ import { openEditor, openEditorSession } from './editor.js';
 import { DraftyError, wrapSupabaseError } from './errors.js';
 import { parseTags } from './parse-tags.js';
 
-export interface NoteSummary {
+const ACTIVE_NOTE_STATUS = 'active';
+const ARCHIVED_NOTE_STATUS = 'archived';
+const DOCS_SYNC_SOURCE_KIND = 'docs-sync';
+
+export type NoteSourceKind = 'manual' | 'docs-sync';
+
+interface NoteSourceMetadata {
+    is_readonly: boolean;
+    source_env_label: string | null;
+    source_hash: string | null;
+    source_kind: NoteSourceKind;
+    source_relative_path: string | null;
+    source_repo_root: string | null;
+    source_worktree_path: string | null;
+    synced_at: string | null;
+}
+
+export interface NoteSummary extends NoteSourceMetadata {
     id: string;
     body: string;
     cli_tags: string[];
@@ -14,11 +31,9 @@ export interface NoteSummary {
     updated_at: string;
 }
 
-export interface NoteDetails extends NoteSummary {
-    updated_at: string;
-}
+export interface NoteDetails extends NoteSummary {}
 
-interface EditableNote {
+interface EditableNote extends NoteSourceMetadata {
     id: string;
     body: string;
     cli_tags: string[];
@@ -89,9 +104,6 @@ export type ArchiveNoteResult =
     | NoteNotFoundResult
     | ChangedBeforeArchiveResult;
 
-const ACTIVE_NOTE_STATUS = 'active';
-const ARCHIVED_NOTE_STATUS = 'archived';
-
 export type NoteEditTarget = 'body' | 'tags';
 
 interface BaseNoteEditResult {
@@ -130,9 +142,24 @@ export async function listNotes(
     supabase: SupabaseClient<Database>,
     options: ListNotesOptions = {},
 ): Promise<NoteSummary[]> {
-    let query = supabase
-        .from('notes')
-        .select('id, body, cli_tags, status, created_at, updated_at');
+    let query = getNotesTable(supabase).select(
+        [
+            'id',
+            'body',
+            'cli_tags',
+            'status',
+            'created_at',
+            'updated_at',
+            'is_readonly',
+            'source_kind',
+            'source_env_label',
+            'source_repo_root',
+            'source_worktree_path',
+            'source_relative_path',
+            'source_hash',
+            'synced_at',
+        ].join(', '),
+    );
 
     if (!options.includeArchived) {
         query = query.eq('status', ACTIVE_NOTE_STATUS);
@@ -150,16 +177,32 @@ export async function listNotes(
         throw wrapSupabaseError('Failed to load notes', error);
     }
 
-    return data ?? [];
+    return (data ?? []) as unknown as NoteSummary[];
 }
 
 export async function getNoteById(
     supabase: SupabaseClient<Database>,
     id: string,
 ): Promise<NoteDetails | null> {
-    const { data, error } = await supabase
-        .from('notes')
-        .select('id, body, cli_tags, status, created_at, updated_at')
+    const { data, error } = await getNotesTable(supabase)
+        .select(
+            [
+                'id',
+                'body',
+                'cli_tags',
+                'status',
+                'created_at',
+                'updated_at',
+                'is_readonly',
+                'source_kind',
+                'source_env_label',
+                'source_repo_root',
+                'source_worktree_path',
+                'source_relative_path',
+                'source_hash',
+                'synced_at',
+            ].join(', '),
+        )
         .eq('id', id)
         .maybeSingle();
 
@@ -167,7 +210,7 @@ export async function getNoteById(
         throw wrapSupabaseError('Failed to load the note', error);
     }
 
-    return data;
+    return (data ?? null) as NoteDetails | null;
 }
 
 export async function archiveNote(
@@ -307,8 +350,7 @@ export async function normalizeStoredMarkdownBodies(
 
     for (const candidate of candidates) {
         const nextBody = normalizeMarkdownForDisplay(candidate.body);
-        const { data, error } = await supabase
-            .from('notes')
+        const { data, error } = await getNotesTable(supabase)
             .update({ body: nextBody })
             .eq('id', candidate.id)
             .eq('updated_at', candidate.updated_at)
@@ -366,6 +408,88 @@ export function formatNoteEditMessages(result: NoteEditResult): string[] {
 
 export function formatTags(tags: string[]): string {
     return tags.length > 0 ? tags.join(', ') : '(none)';
+}
+
+export function isReadonlyNote(
+    note: Pick<NoteSourceMetadata, 'is_readonly'>,
+): boolean {
+    return note.is_readonly;
+}
+
+export function isSyncedDocNote(
+    note: Pick<NoteSourceMetadata, 'source_kind'>,
+): boolean {
+    return note.source_kind === DOCS_SYNC_SOURCE_KIND;
+}
+
+export function formatNoteSourcePath(
+    note: Pick<
+        NoteSourceMetadata,
+        'source_relative_path' | 'source_worktree_path'
+    >,
+): string | null {
+    const worktreePath = normalizeStoredPath(note.source_worktree_path);
+    const relativePath = normalizeStoredPath(note.source_relative_path);
+
+    if (worktreePath && relativePath) {
+        return `${worktreePath}/${relativePath}`;
+    }
+
+    return relativePath ?? worktreePath ?? null;
+}
+
+export function formatNoteSourceSummary(
+    note: Pick<
+        NoteSourceMetadata,
+        | 'is_readonly'
+        | 'source_env_label'
+        | 'source_kind'
+        | 'source_relative_path'
+        | 'source_worktree_path'
+    >,
+): string | null {
+    if (!isSyncedDocNote(note)) {
+        return null;
+    }
+
+    const segments: string[] = [];
+
+    if (note.is_readonly) {
+        segments.push('Read-only');
+    }
+
+    if (note.source_env_label) {
+        segments.push(note.source_env_label);
+    }
+
+    const sourcePath = formatNoteSourcePath(note);
+
+    if (sourcePath) {
+        segments.push(sourcePath);
+    }
+
+    return segments.length > 0 ? segments.join(' · ') : null;
+}
+
+export function buildReadonlyNoteEditMessage(
+    note: Pick<
+        NoteSourceMetadata,
+        | 'source_env_label'
+        | 'source_kind'
+        | 'source_relative_path'
+        | 'source_worktree_path'
+    >,
+): string {
+    if (!isSyncedDocNote(note)) {
+        return 'This note is read-only in Drafty.';
+    }
+
+    const sourcePath = formatNoteSourcePath(note);
+    const envLabel = note.source_env_label?.trim();
+    const sourceContext = [envLabel, sourcePath].filter(Boolean).join(' · ');
+    const sourceSuffix = sourceContext ? ` (${sourceContext})` : '';
+
+    return `This note is synced from${sourceSuffix} and is read-only in Drafty. Edit the source markdown file and run \`drafty sync\` again.`;
 }
 
 export function filterNotesByBodyQuery<T extends Pick<NoteSummary, 'body'>>(
@@ -485,8 +609,7 @@ async function finalizeBodyEdit(
         };
     }
 
-    const { data, error } = await supabase
-        .from('notes')
+    const { data, error } = await getNotesTable(supabase)
         .update({ body: nextBody })
         .eq('id', note.id)
         .select('id, cli_tags')
@@ -520,8 +643,7 @@ async function finalizeTagEdit(
         };
     }
 
-    const { data, error } = await supabase
-        .from('notes')
+    const { data, error } = await getNotesTable(supabase)
         .update({ cli_tags: nextTags })
         .eq('id', note.id)
         .select('id, cli_tags')
@@ -564,8 +686,7 @@ async function listMarkdownNormalizationTargets(
     let fromIndex = 0;
 
     while (true) {
-        const { data, error } = await supabase
-            .from('notes')
+        const { data, error } = await getNotesTable(supabase)
             .select('id, body, status, updated_at')
             .order('created_at', { ascending: false })
             .range(fromIndex, fromIndex + pageSize - 1);
@@ -636,9 +757,23 @@ async function loadEditableNote(
     supabase: SupabaseClient<Database>,
     id: string,
 ): Promise<EditableNote> {
-    const { data, error } = await supabase
-        .from('notes')
-        .select('id, body, cli_tags, status')
+    const { data, error } = await getNotesTable(supabase)
+        .select(
+            [
+                'id',
+                'body',
+                'cli_tags',
+                'status',
+                'is_readonly',
+                'source_kind',
+                'source_env_label',
+                'source_repo_root',
+                'source_worktree_path',
+                'source_relative_path',
+                'source_hash',
+                'synced_at',
+            ].join(', '),
+        )
         .eq('id', id)
         .maybeSingle();
 
@@ -650,9 +785,27 @@ async function loadEditableNote(
         throw new DraftyError('Note not found.');
     }
 
-    if (data.status === ARCHIVED_NOTE_STATUS) {
+    const note = data as unknown as EditableNote;
+
+    if (note.status === ARCHIVED_NOTE_STATUS) {
         throw new DraftyError('Removed notes cannot be edited.');
     }
 
-    return data;
+    if (note.is_readonly) {
+        throw new DraftyError(buildReadonlyNoteEditMessage(note));
+    }
+
+    return note;
+}
+
+function getNotesTable(supabase: SupabaseClient<Database>) {
+    return (supabase as SupabaseClient<any>).from('notes');
+}
+
+function normalizeStoredPath(value: string | null | undefined): string | null {
+    if (!value) {
+        return null;
+    }
+
+    return value.replace(/\\/gu, '/');
 }

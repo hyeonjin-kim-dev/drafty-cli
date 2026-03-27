@@ -63,7 +63,22 @@ drafty work idea
 - `drafty edit <id>`: 본문 또는 태그 편집
 - `drafty rm [id]`: soft delete. `status = 'archived'`로 전환
 
-### 4.4 설정 제거
+### 4.4 docs 동기화
+
+```bash
+drafty sync
+```
+
+동작:
+
+1. 현재 작업 디렉터리를 동기화 루트로 결정한다.
+2. 현재 경로를 포함해 하위의 모든 `.md` 파일을 재귀적으로 수집한다.
+3. 각 markdown 파일을 Drafty의 읽기 전용 메모로 upsert한다.
+4. 이전에 동기화되었지만 현재 스캔에 보이지 않는 파일은 archived 처리한다.
+5. 동기화된 문서는 `drafty list`, `drafty show`에서 원본 환경 라벨과 경로를 함께 보여준다.
+6. 동기화된 문서는 Drafty에서 직접 수정할 수 없다. 원본 로컬 파일을 수정한 뒤 다시 sync해야 한다.
+
+### 4.5 설정 제거
 
 ```bash
 drafty logout
@@ -82,6 +97,7 @@ drafty logout
 - `drafty login`
 - `drafty logout`
 - `drafty list [tags...]`
+- `drafty sync`
 - `drafty show <id>`
 - `drafty edit <id>`
 - `drafty rm [id]`
@@ -98,12 +114,22 @@ drafty logout
 - `status`
 - `created_at`
 - `updated_at`
+- `source_kind`
+- `is_readonly`
+- `source_env_label`
+- `source_repo_root`
+- `source_worktree_path`
+- `source_relative_path`
+- `source_hash`
+- `synced_at`
 
 의도:
 
 - anon key로 `select`, `insert`, `update`가 가능해야 한다.
 - 삭제는 hard delete가 아니라 archived 상태 전환으로 처리한다.
 - 목록은 active 메모만 기본 노출하고, 태그 인자가 있으면 해당 태그들 중 하나라도 포함한 메모만 노출한다.
+- 동기화된 markdown 문서는 읽기 전용이어야 하며, 원본 경로와 환경 정보를 함께 보존해야 한다.
+- 현재 작업 디렉터리 이하의 모든 markdown 파일은 하위 폴더 이름과 무관하게 동기화 대상이어야 한다.
 
 ## 7. 운영 가정
 
@@ -124,5 +150,7 @@ drafty logout
 
 1. `drafty login`이 설정을 저장하고 잘못된 프로젝트를 조기에 감지한다.
 2. 설정만 있으면 capture, list, show, edit, rm이 동작한다.
-3. 오래된 세션 파일이 남아 있어도 새 흐름을 방해하지 않는다.
-4. 문서와 CLI help가 현재 설정 기반 동작과 일치한다.
+3. `drafty sync`가 현재 작업 디렉터리 이하의 markdown 파일을 읽기 전용 메모로 동기화하고, 사라진 파일은 archived 처리한다.
+4. 동기화된 메모는 list/show에서 원본 환경과 경로를 식별할 수 있어야 한다.
+5. 오래된 세션 파일이 남아 있어도 새 흐름을 방해하지 않는다.
+6. 문서와 CLI help가 현재 설정 기반 동작과 일치한다.

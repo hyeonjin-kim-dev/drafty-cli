@@ -11,6 +11,7 @@ import { logoutCommand } from './commands/logout.js';
 import { removeNoteCommand } from './commands/remove.js';
 import { searchNotesCommand } from './commands/search.js';
 import { showNoteCommand } from './commands/show.js';
+import { syncDocsCommand } from './commands/sync.js';
 import { updateCommand } from './commands/update.js';
 import { loadDraftyEnv } from './lib/config.js';
 import { formatError } from './lib/errors.js';
@@ -89,6 +90,20 @@ async function main(): Promise<void> {
         });
 
     program
+        .command('sync')
+        .description(
+            'Sync every markdown file under the current directory as read-only notes',
+        )
+        .option('--env <label>', 'override the sync environment label')
+        .option('--dry-run', 'show planned note changes without writing them')
+        .action(async (options: { dryRun?: boolean; env?: string }) => {
+            await syncDocsCommand({
+                dryRun: options.dryRun ?? false,
+                envLabel: options.env,
+            });
+        });
+
+    program
         .command('update')
         .description('Check for a newer version and update if available')
         .option('--check', 'show current and latest version without installing')
@@ -130,6 +145,7 @@ async function main(): Promise<void> {
             '  $ drafty search meeting notes',
             '  $ drafty rm <id>',
             '  $ drafty rm           # interactive multi-select in a TTY',
+            '  $ drafty sync         # sync all markdown files under the current directory',
             '  $ drafty update       # update to the latest version',
             '  $ drafty update --check  # show available version without installing',
             '  $ drafty normalize-markdown --dry-run  # preview stored note cleanup',
