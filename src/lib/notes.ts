@@ -11,6 +11,7 @@ export interface NoteSummary {
     cli_tags: string[];
     status: string;
     created_at: string;
+    updated_at: string;
 }
 
 export interface NoteDetails extends NoteSummary {
@@ -131,7 +132,7 @@ export async function listNotes(
 ): Promise<NoteSummary[]> {
     let query = supabase
         .from('notes')
-        .select('id, body, cli_tags, status, created_at');
+        .select('id, body, cli_tags, status, created_at, updated_at');
 
     if (!options.includeArchived) {
         query = query.eq('status', ACTIVE_NOTE_STATUS);

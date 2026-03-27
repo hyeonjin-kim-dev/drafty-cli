@@ -62,6 +62,7 @@ const HIDE_CURSOR = '\u001B[?25l';
 const PANEL_DIVIDER = ' │ ';
 const LIST_ITEM_ICON = '●';
 const LIST_ITEM_META_PREFIX = '  ↳ ';
+const LIST_ITEM_SECONDARY_PREFIX = '    ';
 const MARKDOWN_HEADING_PATTERN = /^(#{1,6})\s+(.*)$/u;
 const MARKDOWN_TASK_PATTERN = /^(\s*)[-*]\s+\[( |x|X)\]\s+(.*)$/u;
 const MARKDOWN_BULLET_PATTERN = /^(\s*)[-*+]\s+(.*)$/u;
@@ -487,29 +488,35 @@ function renderListPanel({
     ];
     const visibleNotes = getVisibleNotes(notes, activeIndex, maxVisibleNotes);
     const noteAreaHeight = Math.max(0, targetHeight - LIST_PANEL_FIXED_LINES);
-    const summaryWidth = Math.max(
+    const tagWidth = Math.max(
         14,
         width - visibleLength(getListItemSummaryPrefix(false)),
     );
-    const metaWidth = Math.max(
+    const summaryWidth = Math.max(
         10,
         width - visibleLength(LIST_ITEM_META_PREFIX),
+    );
+    const metaWidth = Math.max(
+        10,
+        width - visibleLength(LIST_ITEM_SECONDARY_PREFIX),
     );
 
     for (const { note, index } of visibleNotes) {
         const isActive = index === activeIndex;
+        const tagLine = `${getListItemSummaryPrefix(isActive)}${buildListItemTagLine(note, tagWidth)}`;
         const summary = truncateText(
             summarizeNoteBody(extractPlainTextSummary(note.body), summaryWidth),
             summaryWidth,
         );
-        const firstLine = `${getListItemSummaryPrefix(isActive)}${summary}`;
-        const secondLine = `${LIST_ITEM_META_PREFIX}${buildNoteMetaLine(note, metaWidth)}`;
+        const summaryLine = `${LIST_ITEM_META_PREFIX}${summary}`;
+        const updatedLine = `${LIST_ITEM_SECONDARY_PREFIX}${buildNoteUpdatedLine(note, metaWidth)}`;
 
-        lines.push(isActive ? theme.style.selected(firstLine) : firstLine);
+        lines.push(isActive ? theme.style.selected(tagLine) : tagLine);
+        lines.push(isActive ? theme.style.selected(summaryLine) : summaryLine);
         lines.push(
             isActive
-                ? theme.style.selected(secondLine)
-                : theme.style.muted(secondLine),
+                ? theme.style.selected(updatedLine)
+                : theme.style.muted(updatedLine),
         );
     }
 
@@ -579,7 +586,7 @@ function renderPreviewPanel({
         }),
         theme.style.rule('─'.repeat(width)),
         truncateText(
-            `${formatTimestamp(note.created_at)} · ${shortNoteId(note.id)}`,
+            `${formatTimestamp(note.updated_at)} · ${shortNoteId(note.id)}`,
             width,
         ),
         ...tagLines,
@@ -946,20 +953,19 @@ function renderInlineTagLine(
     return lines;
 }
 
-function buildNoteMetaLine(note: NoteSummary, width: number): string {
-    const prefix = `${formatTimestamp(note.created_at)} · `;
+function buildListItemTagLine(note: NoteSummary, width: number): string {
     const overflowSuffix = styleText('dim', ' …');
 
     if (note.cli_tags.length === 0) {
-        return truncateText(`${prefix}(none)`, width);
+        return truncateText('(none)', width);
     }
 
-    const segments: string[] = [prefix];
+    const segments: string[] = [];
 
     for (const tag of note.cli_tags) {
         const token = renderTag(tag);
         const joined = segments.join('');
-        const separator = joined === prefix ? '' : ' ';
+        const separator = joined.length === 0 ? '' : ' ';
 
         if (
             visibleLength(joined) + separator.length + visibleLength(token) >
@@ -978,7 +984,11 @@ function buildNoteMetaLine(note: NoteSummary, width: number): string {
         segments.push(`${separator}${token}`);
     }
 
-    return segments.join('');
+    return truncateText(segments.join(''), width);
+}
+
+function buildNoteUpdatedLine(note: NoteSummary, width: number): string {
+    return truncateText(`Updated ${formatTimestamp(note.updated_at)}`, width);
 }
 
 function renderPanelDivider(
@@ -1180,7 +1190,7 @@ function getVisibleNotes(
 function getVisibleNoteCount(panelHeight: number): number {
     const availableRows = Math.max(0, panelHeight - LIST_PANEL_FIXED_LINES);
 
-    return Math.max(4, Math.floor(availableRows / 2));
+    return Math.max(3, Math.floor(availableRows / 3));
 }
 
 function getPanelHeight(tagBarLineCount: number): number {

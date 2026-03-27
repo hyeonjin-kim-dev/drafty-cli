@@ -68,9 +68,9 @@ export async function listNotesCommand(
 
 function printPlainNoteList(notes: NoteSummary[]): void {
     for (const note of notes) {
-        console.log(`${note.id}  ${formatTimestamp(note.created_at)}`);
-        console.log(`Summary: ${summarizeNoteBody(note.body)}`);
-        console.log(`Tags: ${formatTags(note.cli_tags)}`);
+        console.log(formatTags(note.cli_tags));
+        console.log(summarizeNoteBody(note.body));
+        console.log(`Updated: ${formatTimestamp(note.updated_at)}`);
         console.log('');
     }
 }
